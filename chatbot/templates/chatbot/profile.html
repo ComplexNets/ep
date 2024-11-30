@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">Your Profile</h2>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                    <div class="messages">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="{{ form.bio_context.id_for_label }}" class="form-label">Biographical Context</label>
+                            {{ form.bio_context.errors }}
+                            {{ form.bio_context }}
+                            <div class="form-text">{{ form.bio_context.help_text }}</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.writing_goals.id_for_label }}" class="form-label">Writing Goals</label>
+                            {{ form.writing_goals.errors }}
+                            {{ form.writing_goals }}
+                            <div class="form-text">{{ form.writing_goals.help_text }}</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Save Profile</button>
+                        <a href="{% url 'home' %}" class="btn btn-secondary">Back to Chat</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

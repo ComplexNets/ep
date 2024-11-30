@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2 class="mb-0">{{ event.title }}</h2>
+                        <div>
+                            <a href="{% url 'event_update' event.id %}" class="btn btn-primary">Edit Event</a>
+                            <a href="{% url 'start_writing_session' event.id %}" class="btn btn-success">Start Writing</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                    <div class="messages mb-4">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-4">
+                        <h5>Event Details</h5>
+                        <p><strong>Date:</strong> {{ event.date_occurred }}</p>
+                        <p><strong>Description:</strong> {{ event.description }}</p>
+                        <p><strong>Current Writing Phase:</strong> {{ event.get_current_phase_display }}</p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5>Writing Progress</h5>
+                        <div class="progress mb-3">
+                            {% with phases=event.WRITING_PHASE_CHOICES %}
+                            {% for phase, display in phases %}
+                            <div class="progress-bar {% if event.current_phase == phase %}bg-success{% else %}bg-secondary{% endif %}"
+                                 role="progressbar"
+                                 style="width: {{ 100|divided_by:phases|length }}%"
+                                 aria-valuenow="{{ 100|divided_by:phases|length }}"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100">
+                                {{ display }}
+                            </div>
+                            {% endfor %}
+                            {% endwith %}
+                        </div>
+                    </div>
+
+                    {% if threads %}
+                    <div class="mb-4">
+                        <h5>Writing Sessions</h5>
+                        <div class="list-group">
+                            {% for thread in threads %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">Session from {{ thread.created_at|date:"F j, Y" }}</h6>
+                                    <small>{{ thread.get_writing_phase_display }}</small>
+                                </div>
+                                <p class="mb-1">
+                                    <small class="text-muted">Last interaction: {{ thread.last_interaction|timesince }} ago</small>
+                                </p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
