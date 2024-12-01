@@ -17,58 +17,58 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Create or get the assistant
-def get_or_create_assistant():
-    """Get existing assistant or create a new one"""
-    try:
-        assistants = client.beta.assistants.list(
-            order="desc",
-            limit=1,
-        )
-        
-        # Return existing assistant if found
-        if len(assistants.data) > 0:
-            return assistants.data[0]
+def get_personality_instructions(personality):
+    base_instructions = """Your role is to guide users through four distinct writing phases:
             
-        # Create new assistant if none exists
+1. Factual Description: Help users objectively describe what happened, focusing on the concrete details.
+2. Emotional Response: Guide users to explore and express their feelings about the event.
+3. Behavioral Associations: Help users connect the event to their behaviors, patterns, and potential future actions.
+4. Positive Reframing & Growth: Guide users to:
+   - Identify positive aspects or potential benefits from the experience
+   - Reflect on personal growth and lessons learned
+   - Set goals or action steps for future improvement
+   - Find meaning or purpose in their experience
+
+For each phase:
+- Guide users with appropriate prompts and questions for that specific phase
+- Evaluate when they've adequately completed the current phase
+- When you feel they're ready to move to the next phase, respond with: "PHASE_COMPLETE: [current_phase]"
+"""
+    
+    personality_styles = {
+        'friendly': """Maintain a warm, casual, and approachable tone. Use informal language, 
+        share occasional light-hearted comments, and make the writing process feel fun and engaging. 
+        Feel free to use encouraging emojis and conversational phrases.""",
+        
+        'professional': """Maintain a formal, academic tone. Use precise language and professional terminology. 
+        Focus on structured analysis and methodical progression through the writing phases. 
+        Provide clear, well-organized guidance with academic references when relevant.""",
+        
+        'encouraging': """Be highly motivational and energetic. Celebrate small wins, provide frequent positive reinforcement, 
+        and help users see their potential. Use inspiring language and focus on progress and achievement.""",
+        
+        'empathetic': """Be gentle, understanding, and deeply supportive. Acknowledge emotions with sensitivity, 
+        validate feelings, and create a safe space for expression. Use compassionate language and show deep understanding 
+        of the user's experiences."""
+    }
+    
+    return f"{base_instructions}\n\nTone and Style:\n{personality_styles.get(personality, personality_styles['friendly'])}"
+
+def get_or_create_assistant(personality='friendly'):
+    """Get existing assistant or create a new one with specified personality"""
+    try:
+        # Create new assistant with personality-specific instructions
         assistant = client.beta.assistants.create(
             name="Expressive Writing Coach",
-            instructions="""You are an empathetic writing coach specializing in expressive writing. 
-            Your role is to guide users through four distinct writing phases:
-            
-            1. Factual Description: Help users objectively describe what happened, focusing on the concrete details.
-            2. Emotional Response: Guide users to explore and express their feelings about the event.
-            3. Behavioral Associations: Help users connect the event to their behaviors, patterns, and potential future actions.
-            4. Positive Reframing & Growth: Guide users to:
-               - Identify positive aspects or potential benefits from the experience
-               - Reflect on personal growth and lessons learned
-               - Set goals or action steps for future improvement
-               - Find meaning or purpose in their experience
-            
-            For each phase:
-            - Guide users with appropriate prompts and questions for that specific phase
-            - Evaluate when they've adequately completed the current phase
-            - When you feel they're ready to move to the next phase, respond with: "PHASE_COMPLETE: [current_phase]"
-            
-            In the final growth phase, focus on:
-            - Encouraging benefit-finding and positive reframing
-            - Helping users identify specific lessons learned
-            - Guiding them to set concrete, achievable goals
-            - Maintaining sensitivity while promoting resilience
-            
-            Create a safe space for users to express themselves freely.
-            Ask thoughtful questions that help users dig deeper into their experiences.
-            Maintain a supportive and understanding presence throughout the conversation.""",
-            model=os.getenv('OPENAI_MODEL', "gpt-4o"),
-            tools=[{"type": "code_interpreter"}]  
+            instructions=get_personality_instructions(personality),
+            model="gpt-4-1106-preview"
         )
         return assistant
-        
+            
     except Exception as e:
         print(f"Error creating assistant: {str(e)}")
-        raise
-
-# Initialize the assistant
-ASSISTANT = get_or_create_assistant()
+        # Return None or raise exception based on your error handling preference
+        return None
 
 def get_or_create_thread(user):
     """Get existing thread or create a new one for the user"""
@@ -131,6 +131,15 @@ def get_chatbot_response(message, user):
         # Get user context
         user_context = get_user_context(user)
         
+        # Get user's personality preference
+        user_profile = UserProfile.objects.get(user=user)
+        personality = user_profile.personality_preference
+        
+        # Create a new assistant with the user's preferred personality
+        assistant = get_or_create_assistant(personality)
+        if not assistant:
+            return "I apologize, but I encountered an error. Please try again."
+        
         # If this is a new thread or if context exists, send the context first
         if user_context:
             client.beta.threads.messages.create(
@@ -149,7 +158,7 @@ def get_chatbot_response(message, user):
         # Run the assistant
         run = client.beta.threads.runs.create(
             thread_id=user_thread.thread_id,
-            assistant_id=ASSISTANT.id
+            assistant_id=assistant.id
         )
 
         # Wait for completion
@@ -302,7 +311,10 @@ def chat(request):
             data = json.loads(request.body)
             user_message = data.get('message', '')
             bot_response = get_chatbot_response(user_message, request.user)
-            return JsonResponse({'response': bot_response})
+            return JsonResponse({'message': bot_response})
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+            print(f"Chat error: {str(e)}")  # Log the error
+            return JsonResponse({'error': 'An error occurred processing your request'}, status=500)
     return JsonResponse({'error': 'Invalid request method'}, status=405)

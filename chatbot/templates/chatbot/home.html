@@ -4,7 +4,25 @@
 <div class="chat-container h-100">
     <div class="chat-messages flex-grow-1" id="chat-messages">
         <div class="message bot-message">
-            Hello! I'm here to help guide you through expressive writing. Feel free to share your thoughts and feelings, and I'll help you explore them deeper. What's on your mind today?
+            Welcome to your expressive writing journey! I'm here to guide and support you. To get started, you can click on any of these common questions or share what's on your mind:
+        </div>
+        <div class="starter-questions">
+            <div class="question-card" onclick="askQuestion('What is expressive writing and how can it help me?')">
+                <i class="bi bi-journal-text"></i>
+                What is expressive writing?
+            </div>
+            <div class="question-card" onclick="askQuestion('What are the proven benefits of expressive writing according to research studies?')">
+                <i class="bi bi-graph-up"></i>
+                What benefits does research show?
+            </div>
+            <div class="question-card" onclick="askQuestion('Are there any short-term negative effects I should be aware of when doing expressive writing?')">
+                <i class="bi bi-shield-check"></i>
+                Are there any short-term effects to consider?
+            </div>
+            <div class="question-card" onclick="askQuestion('How do we start the expressive writing process?')">
+                <i class="bi bi-play-circle"></i>
+                How do we get started?
+            </div>
         </div>
     </div>
     <div class="chat-input mt-3">
@@ -50,55 +68,69 @@
     }
 
     .user-message {
-        background: var(--bs-primary-bg-subtle);
+        background: var(--bs-primary);
+        color: white;
         margin-left: auto;
         margin-right: 0;
-        text-align: right;
     }
 
     .chat-input {
-        padding: 0.25rem 0;
-        margin-top: auto;
+        flex-shrink: 0;
     }
 
-    /* Typing indicator */
-    .typing-indicator {
-        display: none;
+    .starter-questions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+
+    .question-card {
         background: var(--bs-secondary-bg);
         padding: 1rem;
         border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid var(--bs-border-color);
+    }
+
+    .question-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border-color: var(--bs-primary);
+    }
+
+    .question-card i {
+        margin-right: 0.5rem;
+        color: var(--bs-primary);
+    }
+
+    .typing-indicator {
+        display: flex;
+        align-items: center;
         margin-bottom: 0.75rem;
-        width: fit-content;
     }
 
     .typing-indicator span {
-        display: inline-block;
-        width: 8px;
         height: 8px;
-        background-color: var(--bs-secondary-color);
+        width: 8px;
+        margin: 0 1px;
+        background-color: #9e9ea1;
+        display: block;
         border-radius: 50%;
-        margin-right: 5px;
-        animation: typing 1s infinite;
+        opacity: 0.4;
     }
 
-    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+    .typing-indicator span:nth-of-type(1) { animation: 1s blink infinite .3333s; }
+    .typing-indicator span:nth-of-type(2) { animation: 1s blink infinite .6666s; }
+    .typing-indicator span:nth-of-type(3) { animation: 1s blink infinite .9999s; }
 
-    @keyframes typing {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-5px); }
-    }
-
-    /* Typing animation for bot messages */
-    .typing {
-        overflow: hidden;
-        white-space: pre-wrap;
-        animation: none;
+    @keyframes blink {
+        50% { opacity: 1; }
     }
 </style>
 
 <script>
-    // Setup CSRF token for AJAX requests
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -121,53 +153,57 @@
     typingIndicator.className = 'typing-indicator';
     typingIndicator.innerHTML = '<span></span><span></span><span></span>';
 
-    userInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
-
     function showTypingIndicator() {
-        typingIndicator.style.display = 'block';
         chatMessages.appendChild(typingIndicator);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     function hideTypingIndicator() {
-        typingIndicator.style.display = 'none';
-    }
-
-    async function typeMessage(element, text) {
-        const delay = 30; // Delay between each character
-        for (let i = 0; i < text.length; i++) {
-            element.textContent += text[i];
-            await new Promise(resolve => setTimeout(resolve, delay));
+        if (typingIndicator.parentNode === chatMessages) {
+            chatMessages.removeChild(typingIndicator);
         }
     }
 
-    function addMessage(message, isUser) {
+    async function typeMessage(element, text) {
+        for (let i = 0; i < text.length; i++) {
+            element.textContent += text[i];
+            await new Promise(resolve => setTimeout(resolve, 20));
+        }
+    }
+
+    function addMessage(message, isUser = false) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
         
-        if (isUser) {
-            messageDiv.textContent = message;
-        } else {
-            messageDiv.classList.add('typing');
-            hideTypingIndicator();
+        if (!isUser) {
+            messageDiv.textContent = '';
             typeMessage(messageDiv, message);
+        } else {
+            messageDiv.textContent = message;
         }
         
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+        return messageDiv;
+    }
+
+    function askQuestion(question) {
+        userInput.value = question;
+        sendMessage();
     }
 
     async function sendMessage() {
         const message = userInput.value.trim();
         if (!message) return;
 
-        addMessage(message, true);
+        // Clear input and disable it while processing
         userInput.value = '';
         userInput.disabled = true;
+
+        // Add user message
+        addMessage(message, true);
+
+        // Show typing indicator
         showTypingIndicator();
 
         try {
@@ -175,23 +211,43 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
+                    'X-CSRFToken': csrftoken,
                 },
-                body: JSON.stringify({ message: message })
+                body: JSON.stringify({ message: message }),
             });
 
-            if (!response.ok) throw new Error('Network response was not ok');
-            
             const data = await response.json();
-            addMessage(data.response, false);
+
+            // Hide typing indicator
+            hideTypingIndicator();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'An error occurred');
+            }
+
+            // Add bot response
+            if (data.message) {
+                addMessage(data.message);
+            } else {
+                throw new Error('Invalid response format');
+            }
+
         } catch (error) {
             console.error('Error:', error);
             hideTypingIndicator();
-            addMessage('Sorry, there was an error processing your message.', false);
+            addMessage('I apologize, but I encountered an error. Please try again.');
         } finally {
+            // Re-enable input
             userInput.disabled = false;
             userInput.focus();
         }
     }
+
+    // Handle Enter key
+    userInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
 </script>
 {% endblock %}

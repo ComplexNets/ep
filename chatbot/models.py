@@ -48,11 +48,24 @@ class UserThread(models.Model):
         ]
 
 class UserProfile(models.Model):
+    PERSONALITY_CHOICES = [
+        ('professional', 'Professional and Academic'),
+        ('empathetic', 'Empathetic and Supportive'),
+        ('encouraging', 'Encouraging and Motivational'),
+        ('friendly', 'Friendly and Casual'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     bio_context = models.TextField(blank=True, null=True, 
         help_text="Biographical context for the writing assistant")
     writing_goals = models.TextField(blank=True, null=True,
         help_text="User's writing goals and preferences")
+    personality_preference = models.CharField(
+        max_length=20,
+        choices=PERSONALITY_CHOICES,
+        default='professional',
+        help_text="Choose how you'd like the AI to interact with you"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

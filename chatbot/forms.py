@@ -15,7 +15,12 @@ class UserProfileForm(forms.ModelForm):
 
     class Meta:
         model = UserProfile
-        fields = ['bio_context', 'writing_goals']
+        fields = ['bio_context', 'writing_goals', 'personality_preference']
+        widgets = {
+            'bio_context': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'writing_goals': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'personality_preference': forms.Select(attrs={'class': 'form-control'}),
+        }
 
 class EventForm(forms.ModelForm):
     date_occurred = forms.DateField(

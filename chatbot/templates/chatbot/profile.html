@@ -45,7 +45,7 @@
                             </label>
                             <div class="input-group">
                                 <span class="input-group-text border-end-0" style="background: transparent;">
-                                    <i class="bi bi-target"></i>
+                                    <i class="bi bi-bullseye"></i>
                                 </span>
                                 <textarea name="{{ form.writing_goals.name }}"
                                           class="form-control border-start-0 {% if form.writing_goals.errors %}is-invalid{% endif %}"
@@ -63,13 +63,41 @@
                             </div>
                         </div>
 
+                        <div class="mb-4">
+                            <label for="{{ form.personality_preference.id_for_label }}" class="form-label text-secondary">
+                                AI Personality Style
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text border-end-0" style="background: transparent;">
+                                    <i class="bi bi-emoji-smile"></i>
+                                </span>
+                                <select name="{{ form.personality_preference.name }}"
+                                        class="form-control border-start-0 {% if form.personality_preference.errors %}is-invalid{% endif %}"
+                                        id="{{ form.personality_preference.id_for_label }}">
+                                    {% for value, label in form.personality_preference.field.choices %}
+                                        <option value="{{ value }}" {% if form.personality_preference.value == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.personality_preference.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.personality_preference.errors|join:", " }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="form-text text-muted small">
+                                Choose how you'd like the AI to interact with you during writing sessions
+                            </div>
+                        </div>
+
                         <div class="d-flex justify-content-between align-items-center">
                             <a href="{% url 'home' %}" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-left me-1"></i>
+                                <i class="bi bi-arrow-left me-2"></i>
                                 Back to Dashboard
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-lg me-1"></i>
+                                <i class="bi bi-check-lg me-2"></i>
                                 Save Profile
                             </button>
                         </div>
@@ -77,7 +105,6 @@
                 </div>
             </div>
 
-            <!-- Writing Stats Card -->
             <div class="card mt-4">
                 <div class="card-header">
                     <h3 class="h5 mb-0 text-primary">
@@ -86,30 +113,18 @@
                     </h3>
                 </div>
                 <div class="card-body">
-                    <div class="row g-4">
+                    <div class="row text-center">
                         <div class="col-md-4">
-                            <div class="text-center">
-                                <div class="display-4 text-primary mb-2">
-                                    {{ event_count }}
-                                </div>
-                                <div class="text-muted">Total Events</div>
-                            </div>
+                            <h4 class="h2 mb-0">{{ total_events }}</h4>
+                            <p class="text-muted">Total Events</p>
                         </div>
                         <div class="col-md-4">
-                            <div class="text-center">
-                                <div class="display-4 text-primary mb-2">
-                                    {{ completed_phases }}
-                                </div>
-                                <div class="text-muted">Phases Completed</div>
-                            </div>
+                            <h4 class="h2 mb-0">{{ phases_completed }}</h4>
+                            <p class="text-muted">Phases Completed</p>
                         </div>
                         <div class="col-md-4">
-                            <div class="text-center">
-                                <div class="display-4 text-primary mb-2">
-                                    {{ session_count }}
-                                </div>
-                                <div class="text-muted">Writing Sessions</div>
-                            </div>
+                            <h4 class="h2 mb-0">{{ writing_sessions }}</h4>
+                            <p class="text-muted">Writing Sessions</p>
                         </div>
                     </div>
                 </div>
@@ -123,15 +138,16 @@
 (function () {
     'use strict'
     var forms = document.querySelectorAll('.needs-validation')
-    Array.prototype.slice.call(forms).forEach(function (form) {
-        form.addEventListener('submit', function (event) {
-            if (!form.checkValidity()) {
-                event.preventDefault()
-                event.stopPropagation()
-            }
-            form.classList.add('was-validated')
-        }, false)
-    })
+    Array.prototype.slice.call(forms)
+        .forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        })
 })()
 </script>
 {% endblock %}
