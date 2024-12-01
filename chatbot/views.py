@@ -54,20 +54,24 @@ For each phase:
     
     return f"{base_instructions}\n\nTone and Style:\n{personality_styles.get(personality, personality_styles['friendly'])}"
 
-def get_or_create_assistant(personality='friendly'):
-    """Get existing assistant or create a new one with specified personality"""
+def get_or_create_assistant(personality):
     try:
-        # Create new assistant with personality-specific instructions
+        # Set a high token limit for long writing sessions
+        model = "gpt-4-0125-preview"  # Latest model with 128k context window
+        
+        instructions = get_personality_instructions(personality)
+        
+        # Create a new assistant with high token limits
         assistant = client.beta.assistants.create(
-            name="Expressive Writing Coach",
-            instructions=get_personality_instructions(personality),
-            model="gpt-4-1106-preview"
+            name="Expressive Writing Guide",
+            instructions=instructions,
+            model=model,
+            tools=[],
+            file_ids=[],
         )
         return assistant
-            
     except Exception as e:
         print(f"Error creating assistant: {str(e)}")
-        # Return None or raise exception based on your error handling preference
         return None
 
 def get_or_create_thread(user):
@@ -140,14 +144,6 @@ def get_chatbot_response(message, user):
         if not assistant:
             return "I apologize, but I encountered an error. Please try again."
         
-        # If this is a new thread or if context exists, send the context first
-        if user_context:
-            client.beta.threads.messages.create(
-                thread_id=user_thread.thread_id,
-                role="user",
-                content=f"Important context for our conversation: {user_context}"
-            )
-
         # Add the user's message to the thread
         client.beta.threads.messages.create(
             thread_id=user_thread.thread_id,
@@ -155,20 +151,31 @@ def get_chatbot_response(message, user):
             content=message
         )
 
-        # Run the assistant
+        # Run the assistant with a longer timeout
         run = client.beta.threads.runs.create(
             thread_id=user_thread.thread_id,
-            assistant_id=assistant.id
+            assistant_id=assistant.id,
+            instructions="""Remember that expressive writing sessions can be long (up to 20 minutes). 
+            Do not interrupt the user while they are writing. Only respond when they explicitly ask for guidance 
+            or when they indicate they are done with their current writing. Focus on encouraging deep, 
+            continuous writing rather than frequent back-and-forth dialogue."""
         )
 
-        # Wait for completion
+        # Wait for completion with a longer timeout
+        timeout = 60  # 60 seconds timeout
+        start_time = time.time()
         while True:
+            if time.time() - start_time > timeout:
+                return "I apologize, but the response is taking longer than expected. Please try again."
+                
             run_status = client.beta.threads.runs.retrieve(
                 thread_id=user_thread.thread_id,
                 run_id=run.id
             )
             if run_status.status == 'completed':
                 break
+            elif run_status.status == 'failed':
+                return "I apologize, but I encountered an error. Please try again."
             time.sleep(1)
 
         # Get the assistant's messages
@@ -186,7 +193,7 @@ def get_chatbot_response(message, user):
             assistant_message += f"\n\nGreat progress! Let's move on to the {event.get_current_phase_display()} phase."
         
         # Update last interaction time
-        user_thread.save()  # This updates last_interaction due to auto_now=True
+        user_thread.save()
         
         return assistant_message
 
