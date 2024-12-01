@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'chatbot',
     'accounts',
+    'health_check',  # This line has been added
+    'health_check.db',  # This line has been added
 ]
 
 MIDDLEWARE = [
@@ -85,7 +87,8 @@ WSGI_APPLICATION = 'ep.wsgi.application'
 DATABASES = {
     'default': dj_database_url.config(
         default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'),
-        conn_max_age=600
+        conn_max_age=600,
+        conn_health_checks=True,
     )
 }
 
