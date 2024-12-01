@@ -58,7 +58,7 @@ def get_or_create_assistant():
             Create a safe space for users to express themselves freely.
             Ask thoughtful questions that help users dig deeper into their experiences.
             Maintain a supportive and understanding presence throughout the conversation.""",
-            model=os.getenv('OPENAI_MODEL', "gpt-4-0125-preview"),
+            model=os.getenv('OPENAI_MODEL', "gpt-4o"),
             tools=[{"type": "code_interpreter"}]  
         )
         return assistant
@@ -250,6 +250,15 @@ def event_update(request, event_id):
     return render(request, 'chatbot/event_form.html', {'form': form, 'action': 'Update'})
 
 @login_required
+def event_delete(request, event_id):
+    event = get_object_or_404(Event, id=event_id, user=request.user)
+    if request.method == 'POST':
+        event.delete()
+        messages.success(request, 'Event was successfully deleted.')
+        return redirect('event_list')
+    return redirect('event_detail', event_id=event_id)
+
+@login_required
 def start_writing_session(request, event_id):
     event = get_object_or_404(Event, id=event_id, user=request.user)
     
@@ -285,9 +294,10 @@ def start_writing_session(request, event_id):
     return redirect('home')
 
 @login_required
-@csrf_exempt
 def chat(request):
-    if request.method == 'POST':
+    if request.method == 'GET':
+        return render(request, 'chatbot/home.html')
+    elif request.method == 'POST':
         try:
             data = json.loads(request.body)
             user_message = data.get('message', '')

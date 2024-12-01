@@ -1,125 +1,197 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="chat-container">
-        <h1>Expressive Writing Assistant</h1>
-        <div class="chat-messages" id="chat-messages">
-            <div class="message bot-message">
-                Hello! I'm here to help guide you through expressive writing. Feel free to share your thoughts and feelings, and I'll help you explore them deeper. What's on your mind today?
-            </div>
-        </div>
-        <div class="input-container">
-            <input type="text" id="user-input" placeholder="Type your message here..." autocomplete="off">
-            <button onclick="sendMessage()">Send</button>
+<div class="chat-container h-100">
+    <div class="chat-messages flex-grow-1" id="chat-messages">
+        <div class="message bot-message">
+            Hello! I'm here to help guide you through expressive writing. Feel free to share your thoughts and feelings, and I'll help you explore them deeper. What's on your mind today?
         </div>
     </div>
+    <div class="chat-input mt-3">
+        <div class="input-group">
+            <input type="text" id="user-input" class="form-control" placeholder="Type your message here..." autocomplete="off">
+            <button class="btn btn-primary" onclick="sendMessage()">
+                <i class="bi bi-send"></i> Send
+            </button>
+        </div>
+    </div>
+</div>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-        }
-        .chat-container {
-            background-color: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        .chat-messages {
-            height: 400px;
-            overflow-y: auto;
-            margin-bottom: 20px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .message {
-            margin-bottom: 10px;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .user-message {
-            background-color: #e3f2fd;
-            margin-left: 20%;
-        }
-        .bot-message {
-            background-color: #f5f5f5;
-            margin-right: 20%;
-        }
-        .input-container {
-            display: flex;
-            gap: 10px;
-        }
-        #user-input {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #2196f3;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #1976d2;
-        }
-    </style>
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 60px);
+        margin: -1.5rem;
+        padding: 1rem;
+    }
 
-    <script>
-        const chatMessages = document.getElementById('chat-messages');
-        const userInput = document.getElementById('user-input');
+    .chat-messages {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 1rem;
+        background: var(--bs-dark-bg-subtle);
+        border-radius: 0.5rem;
+        min-height: 75vh;
+        margin-bottom: 0.5rem;
+    }
 
-        userInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
+    .message {
+        margin-bottom: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        max-width: 85%;
+    }
 
-        function addMessage(message, isUser) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            messageDiv.textContent = message;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+    .bot-message {
+        background: var(--bs-secondary-bg);
+        margin-right: auto;
+        margin-left: 0;
+    }
 
-        async function sendMessage() {
-            const message = userInput.value.trim();
-            if (!message) return;
+    .user-message {
+        background: var(--bs-primary-bg-subtle);
+        margin-left: auto;
+        margin-right: 0;
+        text-align: right;
+    }
 
-            addMessage(message, true);
-            userInput.value = '';
-            userInput.disabled = true;
+    .chat-input {
+        padding: 0.25rem 0;
+        margin-top: auto;
+    }
 
-            try {
-                const response = await fetch('/chat/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: message })
-                });
+    /* Typing indicator */
+    .typing-indicator {
+        display: none;
+        background: var(--bs-secondary-bg);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.75rem;
+        width: fit-content;
+    }
 
-                const data = await response.json();
-                if (response.ok) {
-                    addMessage(data.response, false);
-                } else {
-                    addMessage('Sorry, I encountered an error. Please try again.', false);
+    .typing-indicator span {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: var(--bs-secondary-color);
+        border-radius: 50%;
+        margin-right: 5px;
+        animation: typing 1s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typing {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+    }
+
+    /* Typing animation for bot messages */
+    .typing {
+        overflow: hidden;
+        white-space: pre-wrap;
+        animation: none;
+    }
+</style>
+
+<script>
+    // Setup CSRF token for AJAX requests
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
                 }
-            } catch (error) {
-                addMessage('Sorry, I encountered an error. Please try again.', false);
             }
+        }
+        return cookieValue;
+    }
+    
+    const csrftoken = getCookie('csrftoken');
+    const chatMessages = document.getElementById('chat-messages');
+    const userInput = document.getElementById('user-input');
+    const typingIndicator = document.createElement('div');
+    typingIndicator.className = 'typing-indicator';
+    typingIndicator.innerHTML = '<span></span><span></span><span></span>';
 
+    userInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    function showTypingIndicator() {
+        typingIndicator.style.display = 'block';
+        chatMessages.appendChild(typingIndicator);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function hideTypingIndicator() {
+        typingIndicator.style.display = 'none';
+    }
+
+    async function typeMessage(element, text) {
+        const delay = 30; // Delay between each character
+        for (let i = 0; i < text.length; i++) {
+            element.textContent += text[i];
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+
+    function addMessage(message, isUser) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+        
+        if (isUser) {
+            messageDiv.textContent = message;
+        } else {
+            messageDiv.classList.add('typing');
+            hideTypingIndicator();
+            typeMessage(messageDiv, message);
+        }
+        
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    async function sendMessage() {
+        const message = userInput.value.trim();
+        if (!message) return;
+
+        addMessage(message, true);
+        userInput.value = '';
+        userInput.disabled = true;
+        showTypingIndicator();
+
+        try {
+            const response = await fetch('/chat/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({ message: message })
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            addMessage(data.response, false);
+        } catch (error) {
+            console.error('Error:', error);
+            hideTypingIndicator();
+            addMessage('Sorry, there was an error processing your message.', false);
+        } finally {
             userInput.disabled = false;
             userInput.focus();
         }
-    </script>
+    }
+</script>
 {% endblock %}

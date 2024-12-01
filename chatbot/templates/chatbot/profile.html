@@ -20,7 +20,7 @@
                                 About You
                             </label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0">
+                                <span class="input-group-text border-end-0" style="background: transparent;">
                                     <i class="bi bi-person-lines-fill"></i>
                                 </span>
                                 <textarea name="{{ form.bio_context.name }}"
@@ -44,8 +44,8 @@
                                 Writing Goals
                             </label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light border-end-0">
-                                    <i class="bi bi-bullseye"></i>
+                                <span class="input-group-text border-end-0" style="background: transparent;">
+                                    <i class="bi bi-target"></i>
                                 </span>
                                 <textarea name="{{ form.writing_goals.name }}"
                                           class="form-control border-start-0 {% if form.writing_goals.errors %}is-invalid{% endif %}"
