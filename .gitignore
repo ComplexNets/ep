@@ -42,3 +42,5 @@ staticfiles/
 # Virtual environment
 venv/
 ENV/
+
+cascade_chat/
