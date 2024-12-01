@@ -47,7 +47,7 @@
                                             {% for phase, display in phases %}
                                             <div class="progress-bar {% if event.current_phase == phase %}bg-primary{% else %}bg-secondary{% endif %}"
                                                  role="progressbar"
-                                                 style="width: calc(100% / {{ total_phases }})"
+                                                 style="width: 50px"
                                                  aria-valuenow="{{ forloop.counter }}"
                                                  aria-valuemin="0"
                                                  aria-valuemax="{{ total_phases }}">

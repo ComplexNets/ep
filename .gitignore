@@ -29,6 +29,7 @@ media
 
 # Environment variables
 .env
+.env.*
 
 # IDE
 .idea/
