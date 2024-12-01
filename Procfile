@@ -1,2 +1,1 @@
-release: python manage.py migrate
-web: gunicorn ep.wsgi --log-file -
+web: python manage.py migrate && gunicorn ep.wsgi --log-file -
