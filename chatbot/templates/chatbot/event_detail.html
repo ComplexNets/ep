@@ -1,73 +1,141 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-12">
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
             <div class="card">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h2 class="mb-0">{{ event.title }}</h2>
-                        <div>
-                            <a href="{% url 'event_update' event.id %}" class="btn btn-primary">Edit Event</a>
-                            <a href="{% url 'start_writing_session' event.id %}" class="btn btn-success">Start Writing</a>
+                        <h2 class="h4 mb-0 text-primary">{{ event.title }}</h2>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'event_update' event.id %}" class="btn btn-outline-primary">
+                                <i class="bi bi-pencil me-1"></i>
+                                Edit Event
+                            </a>
+                            <a href="{% url 'start_writing_session' event.id %}" class="btn btn-primary">
+                                <i class="bi bi-pen me-1"></i>
+                                Start Writing
+                            </a>
                         </div>
                     </div>
                 </div>
                 <div class="card-body">
-                    {% if messages %}
-                    <div class="messages mb-4">
-                        {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }}">
-                            {{ message }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <div class="mb-4">
-                        <h5>Event Details</h5>
-                        <p><strong>Date:</strong> {{ event.date_occurred }}</p>
-                        <p><strong>Description:</strong> {{ event.description }}</p>
-                        <p><strong>Current Writing Phase:</strong> {{ event.get_current_phase_display }}</p>
-                    </div>
-
-                    <div class="mb-4">
-                        <h5>Writing Progress</h5>
-                        <div class="progress mb-3">
-                            {% with phases=event.WRITING_PHASE_CHOICES %}
-                            {% for phase, display in phases %}
-                            <div class="progress-bar {% if event.current_phase == phase %}bg-success{% else %}bg-secondary{% endif %}"
-                                 role="progressbar"
-                                 style="width: {{ 100|divided_by:phases|length }}%"
-                                 aria-valuenow="{{ 100|divided_by:phases|length }}"
-                                 aria-valuemin="0"
-                                 aria-valuemax="100">
-                                {{ display }}
-                            </div>
-                            {% endfor %}
-                            {% endwith %}
-                        </div>
-                    </div>
-
-                    {% if threads %}
-                    <div class="mb-4">
-                        <h5>Writing Sessions</h5>
-                        <div class="list-group">
-                            {% for thread in threads %}
-                            <div class="list-group-item">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">Session from {{ thread.created_at|date:"F j, Y" }}</h6>
-                                    <small>{{ thread.get_writing_phase_display }}</small>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <!-- Event Details -->
+                            <div class="mb-4">
+                                <h5 class="text-secondary mb-3">Event Details</h5>
+                                <div class="bg-light p-3 rounded-3">
+                                    <div class="mb-3">
+                                        <label class="text-muted small">Date</label>
+                                        <div>{{ event.date_occurred }}</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="text-muted small">Description</label>
+                                        <div>{{ event.description }}</div>
+                                    </div>
+                                    <div>
+                                        <label class="text-muted small">Current Writing Phase</label>
+                                        <div>{{ event.get_current_phase_display }}</div>
+                                    </div>
                                 </div>
-                                <p class="mb-1">
-                                    <small class="text-muted">Last interaction: {{ thread.last_interaction|timesince }} ago</small>
-                                </p>
                             </div>
-                            {% endfor %}
+
+                            <!-- Writing Progress -->
+                            <div class="mb-4">
+                                <h5 class="text-secondary mb-3">Writing Progress</h5>
+                                <div class="bg-light p-3 rounded-3">
+                                    <div class="progress mb-2" style="height: 2rem;">
+                                        {% with phases=event.WRITING_PHASE_CHOICES %}
+                                        {% for phase, display in phases %}
+                                        <div class="progress-bar {% if event.current_phase == phase %}bg-primary{% else %}bg-secondary{% endif %} position-relative"
+                                             role="progressbar"
+                                             style="width: 25%"
+                                             aria-valuenow="25"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100">
+                                            <small class="position-absolute start-50 top-50 translate-middle text-white fw-medium">
+                                                {{ display }}
+                                            </small>
+                                        </div>
+                                        {% endfor %}
+                                        {% endwith %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Writing Sessions -->
+                            {% if threads %}
+                            <div class="mb-4">
+                                <h5 class="text-secondary mb-3">Writing Sessions</h5>
+                                <div class="list-group">
+                                    {% for thread in threads %}
+                                    <div class="list-group-item list-group-item-action">
+                                        <div class="d-flex w-100 justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-1">Session from {{ thread.created_at|date:"F j, Y" }}</h6>
+                                                <p class="mb-1 text-muted small">
+                                                    <i class="bi bi-clock me-1"></i>
+                                                    Last interaction: {{ thread.last_interaction|timesince }} ago
+                                                </p>
+                                            </div>
+                                            <span class="badge bg-primary rounded-pill">{{ thread.get_writing_phase_display }}</span>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <!-- Tips and Guidelines -->
+                            <div class="card border-0 bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary mb-3">
+                                        <i class="bi bi-lightbulb me-2"></i>
+                                        Writing Tips
+                                    </h5>
+                                    <div class="mb-3">
+                                        <h6 class="text-secondary">Current Phase</h6>
+                                        <p class="small">You are in the {{ event.get_current_phase_display }} phase. Focus on:</p>
+                                        {% if event.current_phase == 'facts' %}
+                                        <ul class="small">
+                                            <li>Describe what happened objectively</li>
+                                            <li>Include specific details and timeline</li>
+                                            <li>Focus on the concrete events</li>
+                                        </ul>
+                                        {% elif event.current_phase == 'feelings' %}
+                                        <ul class="small">
+                                            <li>Express your emotions freely</li>
+                                            <li>Explore how you felt during and after</li>
+                                            <li>Be honest with yourself</li>
+                                        </ul>
+                                        {% elif event.current_phase == 'associations' %}
+                                        <ul class="small">
+                                            <li>Connect to past experiences</li>
+                                            <li>Identify behavioral patterns</li>
+                                            <li>Reflect on your reactions</li>
+                                        </ul>
+                                        {% else %}
+                                        <ul class="small">
+                                            <li>Look for positive aspects</li>
+                                            <li>Identify lessons learned</li>
+                                            <li>Set goals for growth</li>
+                                        </ul>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-center">
+                                        <a href="{% url 'start_writing_session' event.id %}" class="btn btn-primary w-100">
+                                            <i class="bi bi-pen me-1"></i>
+                                            Continue Writing
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    {% endif %}
                 </div>
             </div>
         </div>

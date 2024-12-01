@@ -1,60 +1,118 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container-fluid">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-lg-8">
             <div class="card">
                 <div class="card-header">
-                    <h2 class="mb-0">{{ action }} Event</h2>
+                    <h2 class="h4 mb-0 text-primary">
+                        <i class="bi bi-calendar-plus me-2"></i>
+                        {% if form.instance.pk %}
+                        Edit Event
+                        {% else %}
+                        New Event
+                        {% endif %}
+                    </h2>
                 </div>
                 <div class="card-body">
-                    {% if messages %}
-                    <div class="messages mb-4">
-                        {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }}">
-                            {{ message }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <form method="post">
+                    <form method="post" class="needs-validation" novalidate>
                         {% csrf_token %}
                         
-                        <div class="mb-3">
-                            <label for="{{ form.title.id_for_label }}" class="form-label">Title</label>
-                            {{ form.title.errors }}
-                            <input type="text" name="{{ form.title.name }}" 
-                                   id="{{ form.title.id_for_label }}"
-                                   class="form-control"
-                                   value="{{ form.title.value|default:'' }}">
-                            <div class="form-text">{{ form.title.help_text }}</div>
+                        <div class="mb-4">
+                            <label for="{{ form.title.id_for_label }}" class="form-label text-secondary">
+                                Event Title
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="bi bi-type"></i>
+                                </span>
+                                <input type="text" 
+                                       name="{{ form.title.name }}"
+                                       class="form-control border-start-0 {% if form.title.errors %}is-invalid{% endif %}"
+                                       id="{{ form.title.id_for_label }}"
+                                       value="{{ form.title.value|default:'' }}"
+                                       placeholder="Enter a title for your event"
+                                       required>
+                                {% if form.title.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.title.errors|join:", " }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if form.title.help_text %}
+                            <div class="form-text text-muted small">
+                                {{ form.title.help_text }}
+                            </div>
+                            {% endif %}
                         </div>
 
-                        <div class="mb-3">
-                            <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
-                            {{ form.description.errors }}
-                            <textarea name="{{ form.description.name }}"
-                                      id="{{ form.description.id_for_label }}"
-                                      class="form-control"
-                                      rows="4">{{ form.description.value|default:'' }}</textarea>
-                            <div class="form-text">{{ form.description.help_text }}</div>
+                        <div class="mb-4">
+                            <label for="{{ form.description.id_for_label }}" class="form-label text-secondary">
+                                Description
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="bi bi-text-paragraph"></i>
+                                </span>
+                                <textarea name="{{ form.description.name }}"
+                                          class="form-control border-start-0 {% if form.description.errors %}is-invalid{% endif %}"
+                                          id="{{ form.description.id_for_label }}"
+                                          rows="4"
+                                          placeholder="Briefly describe the event">{{ form.description.value|default:'' }}</textarea>
+                                {% if form.description.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.description.errors|join:", " }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if form.description.help_text %}
+                            <div class="form-text text-muted small">
+                                {{ form.description.help_text }}
+                            </div>
+                            {% endif %}
                         </div>
 
-                        <div class="mb-3">
-                            <label for="{{ form.date_occurred.id_for_label }}" class="form-label">Date of Event</label>
-                            {{ form.date_occurred.errors }}
-                            <input type="date" name="{{ form.date_occurred.name }}"
-                                   id="{{ form.date_occurred.id_for_label }}"
-                                   class="form-control"
-                                   value="{{ form.date_occurred.value|date:'Y-m-d'|default:'' }}">
-                            <div class="form-text">{{ form.date_occurred.help_text }}</div>
+                        <div class="mb-4">
+                            <label for="{{ form.date_occurred.id_for_label }}" class="form-label text-secondary">
+                                Date of Event
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="bi bi-calendar"></i>
+                                </span>
+                                <input type="date"
+                                       name="{{ form.date_occurred.name }}"
+                                       class="form-control border-start-0 {% if form.date_occurred.errors %}is-invalid{% endif %}"
+                                       id="{{ form.date_occurred.id_for_label }}"
+                                       value="{{ form.date_occurred.value|date:'Y-m-d'|default:'' }}"
+                                       required>
+                                {% if form.date_occurred.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.date_occurred.errors|join:", " }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if form.date_occurred.help_text %}
+                            <div class="form-text text-muted small">
+                                {{ form.date_occurred.help_text }}
+                            </div>
+                            {% endif %}
                         </div>
 
-                        <div class="d-flex justify-content-between">
-                            <button type="submit" class="btn btn-primary">{{ action }} Event</button>
-                            <a href="{% url 'event_list' %}" class="btn btn-secondary">Back to Events</a>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="{% url 'event_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>
+                                Back to Events
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>
+                                {% if form.instance.pk %}
+                                Save Changes
+                                {% else %}
+                                Create Event
+                                {% endif %}
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -62,4 +120,21 @@
         </div>
     </div>
 </div>
+
+<script>
+// Form validation
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault()
+                event.stopPropagation()
+            }
+            form.classList.add('was-validated')
+        }, false)
+    })
+})()
+</script>
 {% endblock %}

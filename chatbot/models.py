@@ -7,7 +7,8 @@ class Event(models.Model):
     WRITING_PHASE_CHOICES = [
         ('facts', 'Factual Description'),
         ('feelings', 'Emotional Response'),
-        ('associations', 'Behavioral Associations')
+        ('associations', 'Behavioral Associations'),
+        ('growth', 'Positive Reframing & Growth')
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE)

@@ -1,46 +1,137 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container-fluid">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-lg-8">
             <div class="card">
                 <div class="card-header">
-                    <h2 class="mb-0">Your Profile</h2>
+                    <h2 class="h4 mb-0 text-primary">
+                        <i class="bi bi-person-circle me-2"></i>
+                        Profile Settings
+                    </h2>
                 </div>
                 <div class="card-body">
-                    {% if messages %}
-                    <div class="messages">
-                        {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }}">
-                            {{ message }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <form method="post">
+                    <form method="post" class="needs-validation" novalidate>
                         {% csrf_token %}
-                        <div class="mb-3">
-                            <label for="{{ form.bio_context.id_for_label }}" class="form-label">Biographical Context</label>
-                            {{ form.bio_context.errors }}
-                            {{ form.bio_context }}
-                            <div class="form-text">{{ form.bio_context.help_text }}</div>
+
+                        <div class="mb-4">
+                            <label for="{{ form.bio_context.id_for_label }}" class="form-label text-secondary">
+                                About You
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="bi bi-person-lines-fill"></i>
+                                </span>
+                                <textarea name="{{ form.bio_context.name }}"
+                                          class="form-control border-start-0 {% if form.bio_context.errors %}is-invalid{% endif %}"
+                                          id="{{ form.bio_context.id_for_label }}"
+                                          rows="4"
+                                          placeholder="Share a bit about yourself, your background, and what brings you here">{{ form.bio_context.value|default:'' }}</textarea>
+                                {% if form.bio_context.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.bio_context.errors|join:", " }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="form-text text-muted small">
+                                This information helps personalize your writing experience
+                            </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="{{ form.writing_goals.id_for_label }}" class="form-label">Writing Goals</label>
-                            {{ form.writing_goals.errors }}
-                            {{ form.writing_goals }}
-                            <div class="form-text">{{ form.writing_goals.help_text }}</div>
+                        <div class="mb-4">
+                            <label for="{{ form.writing_goals.id_for_label }}" class="form-label text-secondary">
+                                Writing Goals
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="bi bi-bullseye"></i>
+                                </span>
+                                <textarea name="{{ form.writing_goals.name }}"
+                                          class="form-control border-start-0 {% if form.writing_goals.errors %}is-invalid{% endif %}"
+                                          id="{{ form.writing_goals.id_for_label }}"
+                                          rows="4"
+                                          placeholder="What do you hope to achieve through expressive writing?">{{ form.writing_goals.value|default:'' }}</textarea>
+                                {% if form.writing_goals.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.writing_goals.errors|join:", " }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="form-text text-muted small">
+                                Your goals help us provide better guidance during writing sessions
+                            </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary">Save Profile</button>
-                        <a href="{% url 'home' %}" class="btn btn-secondary">Back to Chat</a>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>
+                                Back to Dashboard
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>
+                                Save Profile
+                            </button>
+                        </div>
                     </form>
+                </div>
+            </div>
+
+            <!-- Writing Stats Card -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h3 class="h5 mb-0 text-primary">
+                        <i class="bi bi-graph-up me-2"></i>
+                        Writing Progress
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <div class="display-4 text-primary mb-2">
+                                    {{ event_count }}
+                                </div>
+                                <div class="text-muted">Total Events</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <div class="display-4 text-primary mb-2">
+                                    {{ completed_phases }}
+                                </div>
+                                <div class="text-muted">Phases Completed</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <div class="display-4 text-primary mb-2">
+                                    {{ session_count }}
+                                </div>
+                                <div class="text-muted">Writing Sessions</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Form validation
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault()
+                event.stopPropagation()
+            }
+            form.classList.add('was-validated')
+        }, false)
+    })
+})()
+</script>
 {% endblock %}

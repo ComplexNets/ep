@@ -33,9 +33,30 @@ def get_or_create_assistant():
         assistant = client.beta.assistants.create(
             name="Expressive Writing Coach",
             instructions="""You are an empathetic writing coach specializing in expressive writing. 
-            Guide users through emotional exploration and self-reflection through writing.
+            Your role is to guide users through four distinct writing phases:
+            
+            1. Factual Description: Help users objectively describe what happened, focusing on the concrete details.
+            2. Emotional Response: Guide users to explore and express their feelings about the event.
+            3. Behavioral Associations: Help users connect the event to their behaviors, patterns, and potential future actions.
+            4. Positive Reframing & Growth: Guide users to:
+               - Identify positive aspects or potential benefits from the experience
+               - Reflect on personal growth and lessons learned
+               - Set goals or action steps for future improvement
+               - Find meaning or purpose in their experience
+            
+            For each phase:
+            - Guide users with appropriate prompts and questions for that specific phase
+            - Evaluate when they've adequately completed the current phase
+            - When you feel they're ready to move to the next phase, respond with: "PHASE_COMPLETE: [current_phase]"
+            
+            In the final growth phase, focus on:
+            - Encouraging benefit-finding and positive reframing
+            - Helping users identify specific lessons learned
+            - Guiding them to set concrete, achievable goals
+            - Maintaining sensitivity while promoting resilience
+            
             Create a safe space for users to express themselves freely.
-            Ask thoughtful questions that help users dig deeper into their feelings and experiences.
+            Ask thoughtful questions that help users dig deeper into their experiences.
             Maintain a supportive and understanding presence throughout the conversation.""",
             model=os.getenv('OPENAI_MODEL', "gpt-4-0125-preview"),
             tools=[{"type": "code_interpreter"}]  
@@ -74,10 +95,38 @@ def get_user_context(user):
     
     return context if len(context) > 14 else None  # Return None if no real context added
 
+def check_phase_progression(message_content, event, user_thread):
+    """Check if the AI has indicated phase completion and update accordingly"""
+    if "PHASE_COMPLETE:" in message_content:
+        current_phase = event.current_phase
+        phase_mapping = {
+            'facts': 'feelings',
+            'feelings': 'associations',
+            'associations': 'growth',
+            'growth': 'growth'  # Stay in final phase
+        }
+        
+        # Update to next phase
+        next_phase = phase_mapping[current_phase]
+        event.current_phase = next_phase
+        event.save()
+        
+        # Create new thread for next phase
+        new_thread = client.beta.threads.create()
+        user_thread.thread_id = new_thread.id
+        user_thread.writing_phase = next_phase
+        user_thread.save()
+        
+        return True
+    return False
+
 def get_chatbot_response(message, user):
     try:
         # Get or create user's thread
         user_thread = get_or_create_thread(user)
+        
+        # Get the associated event
+        event = user_thread.event
         
         # Get user context
         user_context = get_user_context(user)
@@ -100,20 +149,10 @@ def get_chatbot_response(message, user):
         # Run the assistant
         run = client.beta.threads.runs.create(
             thread_id=user_thread.thread_id,
-            assistant_id=ASSISTANT.id,
-            instructions="""You are an empathetic writing coach specializing in expressive writing. Your role is to:
-            1. Create a safe, non-judgmental space for emotional expression
-            2. Ask thoughtful questions that help users explore their feelings deeper
-            3. Encourage detailed, specific writing rather than general statements
-            4. Help users identify and articulate their emotions
-            5. Provide gentle guidance while letting users lead their own emotional journey
-            6. Maintain a supportive and encouraging tone throughout the conversation
-            
-            Keep responses concise but meaningful, and always maintain a warm, understanding presence.
-            Use any provided user context to personalize your responses and guidance."""
+            assistant_id=ASSISTANT.id
         )
 
-        # Wait for the response
+        # Wait for completion
         while True:
             run_status = client.beta.threads.runs.retrieve(
                 thread_id=user_thread.thread_id,
@@ -121,29 +160,30 @@ def get_chatbot_response(message, user):
             )
             if run_status.status == 'completed':
                 break
-            elif run_status.status == 'failed':
-                return "I apologize, but I encountered an error. Please try again."
-            time.sleep(0.5)
+            time.sleep(1)
 
-        # Get the assistant's response
+        # Get the assistant's messages
         messages = client.beta.threads.messages.list(
-            thread_id=user_thread.thread_id,
-            order="desc",
-            limit=1
+            thread_id=user_thread.thread_id
         )
+        
+        # Get the latest assistant message
+        assistant_message = messages.data[0].content[0].text.value
+        
+        # Check for phase progression
+        if event and check_phase_progression(assistant_message, event, user_thread):
+            # Remove the PHASE_COMPLETE marker from the message
+            assistant_message = assistant_message.replace("PHASE_COMPLETE: " + event.current_phase, "")
+            assistant_message += f"\n\nGreat progress! Let's move on to the {event.get_current_phase_display()} phase."
         
         # Update last interaction time
         user_thread.save()  # This updates last_interaction due to auto_now=True
         
-        # Get the latest assistant message
-        for msg in messages.data:
-            if msg.role == "assistant":
-                return msg.content[0].text.value
-                
-        return "I apologize, but I couldn't generate a response. Please try again."
+        return assistant_message
 
     except Exception as e:
-        return str(e)
+        print(f"Error getting chatbot response: {str(e)}")
+        return "I apologize, but I encountered an error. Please try again."
 
 @login_required
 def home(request):
@@ -226,7 +266,8 @@ def start_writing_session(request, event_id):
     phase_prompts = {
         'facts': "Let's focus on describing the factual details of this event. What happened? When? Where? Who was involved?",
         'feelings': "Now, let's explore your emotional response to this event. How did you feel during and after?",
-        'associations': "Let's connect this experience to your current behaviors and patterns. How do you see this event influencing your present life?"
+        'associations': "Let's connect this experience to your current behaviors and patterns. How do you see this event influencing your present life?",
+        'growth': "Let's focus on finding positive aspects and growth opportunities from this experience. What did you learn? How can you apply this to your life?"
     }
     
     initial_message = (
