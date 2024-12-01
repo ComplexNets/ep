@@ -1,48 +1,93 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2>Your Events</h2>
-                <a href="{% url 'event_create' %}" class="btn btn-primary">Create New Event</a>
-            </div>
-
-            {% if messages %}
-            <div class="messages mb-4">
-                {% for message in messages %}
-                <div class="alert alert-{{ message.tags }}">
-                    {{ message }}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            {% if events %}
-            <div class="list-group">
-                {% for event in events %}
-                <div class="list-group-item">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h5 class="mb-1">{{ event.title }}</h5>
-                        <small>{{ event.date_occurred }}</small>
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2 class="h4 mb-0 text-primary">
+                            <i class="bi bi-calendar-event me-2"></i>
+                            My Events
+                        </h2>
+                        <a href="{% url 'event_create' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-lg me-1"></i>
+                            New Event
+                        </a>
                     </div>
-                    <p class="mb-1">{{ event.description|truncatewords:30 }}</p>
-                    <div class="d-flex justify-content-between align-items-center mt-2">
-                        <small>Current Phase: {{ event.get_current_phase_display }}</small>
-                        <div>
-                            <a href="{% url 'event_detail' event.id %}" class="btn btn-sm btn-outline-primary">View Details</a>
-                            <a href="{% url 'start_writing_session' event.id %}" class="btn btn-sm btn-success">Start Writing</a>
+                </div>
+                <div class="card-body p-4">
+                    {% if events %}
+                    <div class="row g-4">
+                        {% for event in events %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-body p-4">
+                                    <h5 class="card-title text-primary mb-3 text-truncate">{{ event.title }}</h5>
+                                    <div class="mb-4">
+                                        <div class="text-muted small mb-2">
+                                            <i class="bi bi-calendar me-1"></i>
+                                            {{ event.date_occurred }}
+                                        </div>
+                                        <p class="card-text small text-secondary mb-0">
+                                            {{ event.description|truncatechars:100 }}
+                                        </p>
+                                    </div>
+                                    <div class="mb-4">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <small class="text-muted">Progress</small>
+                                            <span class="badge bg-light text-primary text-wrap small" style="max-width: 150px;">
+                                                {{ event.get_current_phase_display }}
+                                            </span>
+                                        </div>
+                                        <div class="progress" style="height: 0.5rem;">
+                                            {% with phases=event.WRITING_PHASE_CHOICES %}
+                                            {% with total_phases=phases|length %}
+                                            {% for phase, display in phases %}
+                                            <div class="progress-bar {% if event.current_phase == phase %}bg-primary{% else %}bg-secondary{% endif %}"
+                                                 role="progressbar"
+                                                 style="width: calc(100% / {{ total_phases }})"
+                                                 aria-valuenow="{{ forloop.counter }}"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="{{ total_phases }}">
+                                                <span class="visually-hidden">{{ display }}</span>
+                                            </div>
+                                            {% endfor %}
+                                            {% endwith %}
+                                            {% endwith %}
+                                        </div>
+                                    </div>
+                                    <div class="d-grid gap-2">
+                                        <a href="{% url 'start_writing_session' event.id %}" class="btn btn-primary">
+                                            <i class="bi bi-pen me-1"></i>
+                                            Continue Writing
+                                        </a>
+                                        <a href="{% url 'event_detail' event.id %}" class="btn btn-outline-primary">
+                                            <i class="bi bi-eye me-1"></i>
+                                            View Details
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        {% endfor %}
                     </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="mb-4">
+                            <i class="bi bi-journal-text text-secondary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h5 class="text-secondary mb-3">No Events Yet</h5>
+                        <p class="text-muted mb-4">Start your expressive writing journey by creating your first event.</p>
+                        <a href="{% url 'event_create' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-lg me-1"></i>
+                            Create First Event
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endfor %}
             </div>
-            {% else %}
-            <div class="alert alert-info">
-                <p>You haven't created any events yet. Click "Create New Event" to start your expressive writing journey.</p>
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>
