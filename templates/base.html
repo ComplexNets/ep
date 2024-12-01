@@ -19,16 +19,17 @@
             flex-direction: column;
             background-color: var(--custom-bg);
             color: var(--custom-text);
+            padding-top: 60px; /* Fixed height for navbar */
         }
 
         /* Sidebar styles */
         .sidebar {
             position: fixed;
-            top: 0;
+            top: 60px; /* Adjusted to match navbar height */
             bottom: 0;
             left: 0;
             z-index: 100;
-            padding: 48px 0 0;
+            padding: 0;
             box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
             width: 280px;
             background-color: var(--custom-bg);
@@ -49,89 +50,91 @@
             color: var(--bs-primary);
         }
 
-        .sidebar-heading {
-            font-size: .75rem;
-            text-transform: uppercase;
-            padding: 1rem 1.5rem;
-            color: var(--bs-secondary);
-        }
-
-        /* Main content */
+        /* Main content area */
         .main-content {
-            margin-left: 280px;
-            padding: 48px 1.5rem 1.5rem;
+            margin-left: 280px; /* Match sidebar width */
+            padding: 1rem;
         }
 
+        /* Mobile adjustments */
         @media (max-width: 768px) {
             .sidebar {
-                transform: translateX(-100%);
-                transition: transform .35s ease-out;
-            }
-            
-            .sidebar.show {
-                transform: translateX(0);
+                width: 100%;
+                height: auto;
+                position: relative;
+                top: 0;
+                padding-top: 1rem;
             }
 
             .main-content {
                 margin-left: 0;
-                padding-top: 1rem;
+                padding: 1rem;
+            }
+
+            .navbar {
+                position: fixed !important;
+                top: 0;
+                width: 100%;
+                z-index: 1030;
+            }
+
+            /* Ensure auth forms are visible on mobile */
+            .auth-container {
+                padding-top: 2rem;
+                min-height: calc(100vh - 60px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .auth-box {
+                width: 100%;
+                max-width: 400px;
+                padding: 2rem;
+                margin: 1rem;
+                background-color: var(--custom-bg);
+                border: 1px solid var(--custom-border);
+                border-radius: 8px;
             }
         }
 
-        /* Chat styles */
-        .chat-container {
+        /* Auth form styles */
+        .auth-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 60px);
+            padding: 2rem;
+        }
+
+        .auth-box {
+            width: 100%;
+            max-width: 400px;
+            padding: 2rem;
             background-color: var(--custom-bg);
             border: 1px solid var(--custom-border);
-            border-radius: 0.5rem;
-            height: calc(100vh - 200px);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .auth-form {
             display: flex;
             flex-direction: column;
+            gap: 1rem;
         }
 
-        .chat-messages {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 1rem;
+        .auth-button {
+            background-color: var(--bs-primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
         }
 
-        .chat-input {
-            border-top: 1px solid var(--custom-border);
-            padding: 1rem;
-            background-color: var(--custom-bg);
-        }
-
-        .message {
-            margin-bottom: 1rem;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            background-color: rgba(var(--bs-primary-rgb), 0.1);
-        }
-
-        .theme-icon-active {
-            display: none;
-        }
-
-        [data-bs-theme="dark"] .theme-icon-active {
-            display: inline-block;
-        }
-
-        [data-bs-theme="dark"] .theme-icon-inactive {
-            display: none;
-        }
-
-        .card {
-            background-color: var(--custom-bg);
-            border: 1px solid var(--custom-border);
-            transition: transform 0.2s;
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-        }
-
-        .navbar {
-            background-color: var(--custom-bg);
-            border-bottom: 1px solid var(--custom-border);
+        .auth-links {
+            margin-top: 1rem;
+            text-align: center;
         }
     </style>
 </head>
@@ -143,97 +146,74 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <a class="navbar-brand" href="{% url 'home' %}">
-                <i class="bi bi-journal-text"></i>
+                <i class="bi bi-journal-text me-2"></i>
                 Expressive Writing Assistant
             </a>
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <button class="btn nav-link" id="theme-toggle" aria-label="Toggle theme">
-                        <i class="bi bi-moon-stars-fill theme-icon-active"></i>
-                        <i class="bi bi-sun-fill theme-icon-inactive"></i>
-                    </button>
-                </li>
+            <div class="d-flex align-items-center">
+                <button id="theme-toggle" class="btn btn-link">
+                    <i class="bi bi-moon-stars"></i>
+                </button>
                 {% if user.is_authenticated %}
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'profile' %}">
-                        <i class="bi bi-person-circle"></i> {{ user.username }}
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'logout' %}">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </a>
-                </li>
+                    <div class="dropdown">
+                        <button class="btn btn-link dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'profile' %}">Profile</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+                        </ul>
+                    </div>
                 {% else %}
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'login' %}">
-                        <i class="bi bi-box-arrow-in-right"></i> Login
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'register' %}">
-                        <i class="bi bi-person-plus"></i> Register
-                    </a>
-                </li>
+                    <a href="{% url 'login' %}" class="btn btn-link">Login</a>
+                    <a href="{% url 'register' %}" class="btn btn-primary">Register</a>
                 {% endif %}
-            </ul>
+            </div>
         </div>
     </nav>
 
+    {% if user.is_authenticated %}
     <!-- Sidebar -->
     <nav id="sidebarMenu" class="sidebar collapse d-md-block">
         <div class="position-sticky">
-            <div class="sidebar-heading">Writing</div>
             <ul class="nav flex-column">
                 <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'chat' %}active{% endif %}" 
-                       href="{% url 'chat' %}">
-                        <i class="bi bi-chat-dots"></i>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'chat' %}active{% endif %}" href="{% url 'chat' %}">
+                        <i class="bi bi-chat-dots me-2"></i>
                         Chat
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'event_list' %}active{% endif %}"
-                       href="{% url 'event_list' %}">
-                        <i class="bi bi-journal-text"></i>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'event_list' %}active{% endif %}" href="{% url 'event_list' %}">
+                        <i class="bi bi-journal-text me-2"></i>
                         Events
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'event_create' %}active{% endif %}"
-                       href="{% url 'event_create' %}">
-                        <i class="bi bi-plus-circle"></i>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'event_create' %}active{% endif %}" href="{% url 'event_create' %}">
+                        <i class="bi bi-plus-circle me-2"></i>
                         New Event
-                    </a>
-                </li>
-            </ul>
-
-            <div class="sidebar-heading">Account</div>
-            <ul class="nav flex-column">
-                <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"
-                       href="{% url 'profile' %}">
-                        <i class="bi bi-person"></i>
-                        Profile
                     </a>
                 </li>
             </ul>
         </div>
     </nav>
+    {% endif %}
 
     <!-- Main content -->
-    <main class="main-content">
+    <main class="{% if user.is_authenticated %}main-content{% endif %}">
         {% if messages %}
-        {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <div id="messages">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
         {% endif %}
-
-        {% block content %}
-        {% endblock %}
+        
+        {% block content %}{% endblock %}
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -242,42 +222,30 @@
             const themeToggle = document.getElementById('theme-toggle');
             const html = document.documentElement;
             
-            // Check for saved theme preference, otherwise use system preference
+            // Check for saved theme preference
             const savedTheme = localStorage.getItem('theme');
             if (savedTheme) {
                 html.setAttribute('data-bs-theme', savedTheme);
-                document.body.classList.toggle('dark-mode', savedTheme === 'dark');
-            } else {
-                const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                html.setAttribute('data-bs-theme', systemTheme);
-                document.body.classList.toggle('dark-mode', systemTheme === 'dark');
+                updateThemeIcon(savedTheme);
             }
-
-            // Theme toggle button handler
+            
+            // Theme toggle functionality
             themeToggle.addEventListener('click', function() {
                 const currentTheme = html.getAttribute('data-bs-theme');
                 const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
                 
                 html.setAttribute('data-bs-theme', newTheme);
-                document.body.classList.toggle('dark-mode', newTheme === 'dark');
                 localStorage.setItem('theme', newTheme);
+                updateThemeIcon(newTheme);
             });
-
-            // Listen for system theme changes
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-                if (!localStorage.getItem('theme')) {
-                    const newTheme = e.matches ? 'dark' : 'light';
-                    html.setAttribute('data-bs-theme', newTheme);
-                    document.body.classList.toggle('dark-mode', newTheme === 'dark');
+            
+            function updateThemeIcon(theme) {
+                const icon = themeToggle.querySelector('i');
+                if (theme === 'dark') {
+                    icon.className = 'bi bi-sun';
+                } else {
+                    icon.className = 'bi bi-moon-stars';
                 }
-            });
-
-            // Handle mobile sidebar
-            const sidebarToggle = document.querySelector('[data-bs-toggle="collapse"]');
-            if (sidebarToggle) {
-                sidebarToggle.addEventListener('click', function() {
-                    document.querySelector('.sidebar').classList.toggle('show');
-                });
             }
         });
     </script>
