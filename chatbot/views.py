@@ -67,7 +67,6 @@ def get_or_create_assistant(personality):
             instructions=instructions,
             model=model,
             tools=[],
-            file_ids=[],
         )
         return assistant
     except Exception as e:

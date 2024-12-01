@@ -25,22 +25,6 @@
             </div>
         </div>
     </div>
-    <div id="timer-container" class="d-none">
-        <div class="alert alert-info d-flex justify-content-between align-items-center">
-            <div>
-                <i class="bi bi-clock me-2"></i>
-                Writing Time: <span id="timer">20:00</span>
-            </div>
-            <div>
-                <button id="pauseTimer" class="btn btn-sm btn-outline-primary me-2">
-                    <i class="bi bi-pause-fill"></i> Pause
-                </button>
-                <button id="resetTimer" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-arrow-clockwise"></i> Reset
-                </button>
-            </div>
-        </div>
-    </div>
     <div class="chat-input mt-3">
         <div class="input-group">
             <input type="text" id="user-input" class="form-control" placeholder="Type your message here..." autocomplete="off">
@@ -265,73 +249,6 @@
             sendMessage();
         }
     });
-
-    // Timer functionality
-    let timerInterval;
-    let timeLeft = 20 * 60; // 20 minutes in seconds
-    let timerPaused = false;
-
-    function startTimer() {
-        document.getElementById('timer-container').classList.remove('d-none');
-        if (!timerInterval) {
-            timerInterval = setInterval(updateTimer, 1000);
-        }
-    }
-
-    function updateTimer() {
-        if (!timerPaused && timeLeft > 0) {
-            timeLeft--;
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            document.getElementById('timer').textContent = 
-                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            
-            // Warning when 5 minutes remaining
-            if (timeLeft === 300) {
-                showNotification('5 minutes remaining in your writing session.');
-            }
-            // Warning when 1 minute remaining
-            else if (timeLeft === 60) {
-                showNotification('1 minute remaining in your writing session.');
-            }
-            // Session complete
-            else if (timeLeft === 0) {
-                showNotification('Writing session complete! Take a moment to review what you\'ve written.');
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-        }
-    }
-
-    function showNotification(message) {
-        const notification = document.createElement('div');
-        notification.className = 'alert alert-info alert-dismissible fade show';
-        notification.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
-        document.getElementById('chat-messages').appendChild(notification);
-    }
-
-    document.getElementById('pauseTimer').addEventListener('click', function() {
-        timerPaused = !timerPaused;
-        this.innerHTML = timerPaused ? 
-            '<i class="bi bi-play-fill"></i> Resume' : 
-            '<i class="bi bi-pause-fill"></i> Pause';
-    });
-
-    document.getElementById('resetTimer').addEventListener('click', function() {
-        timeLeft = 20 * 60;
-        timerPaused = false;
-        document.getElementById('pauseTimer').innerHTML = '<i class="bi bi-pause-fill"></i> Pause';
-        updateTimer();
-    });
-
-    // Start timer when user starts writing
-    userInput.addEventListener('focus', function() {
-        if (!timerInterval && timeLeft === 20 * 60) {
-            startTimer();
-        }
-    });
 </script>
+
 {% endblock %}
