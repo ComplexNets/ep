@@ -49,6 +49,54 @@ class UserThread(models.Model):
             models.Index(fields=['event', 'writing_phase']),
         ]
 
+class ChatMessage(models.Model):
+    MESSAGE_TYPES = [
+        ('user', 'User Message'),
+        ('assistant', 'Assistant Message'),
+        ('system', 'System Message')
+    ]
+    
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True, blank=True)
+    user_thread = models.ForeignKey(UserThread, on_delete=models.CASCADE)
+    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPES)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['event', 'created_at'], name='chat_event_created_idx'),
+            models.Index(fields=['user_thread', 'created_at'], name='chat_thread_created_idx'),
+        ]
+    
+    def get_formatted_time(self):
+        return self.created_at.strftime("%I:%M %p")
+    
+    def get_formatted_date(self):
+        return self.created_at.strftime("%B %d, %Y")
+
+class Conversation(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['user', 'event', 'updated_at'], name='conv_user_event_updated_idx'),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} ({self.get_formatted_date()})"
+    
+    def get_formatted_date(self):
+        return self.created_at.strftime("%B %d, %Y")
+    
+    def get_message_count(self):
+        return self.chatmessage_set.count()
+
 class UserProfile(models.Model):
     PERSONALITY_CHOICES = [
         ('professional', 'Professional and Academic'),
@@ -73,6 +121,24 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s profile"
+
+class ChatSession(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='chat_sessions')
+    phase = models.CharField(max_length=50)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    messages_json = models.TextField()  # Store messages as JSON string
+
+    def set_messages(self, messages):
+        self.messages_json = json.dumps(messages)
+
+    def get_messages(self):
+        return json.loads(self.messages_json)
+
+    def __str__(self):
+        return f"Chat Session for {self.event} - {self.phase} at {self.timestamp}"
+
+    class Meta:
+        ordering = ['-timestamp']
 
 # Signal to create UserProfile when a new User is created
 @receiver(post_save, sender=User)

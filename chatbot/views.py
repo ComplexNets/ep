@@ -9,14 +9,18 @@ from dotenv import load_dotenv
 import time
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import UserThread, UserProfile, Event
+from .models import UserThread, UserProfile, Event, Conversation, ChatMessage, ChatSession
 from .forms import UserProfileForm, EventForm
+from django.utils import timezone
+import logging
+from django.views.decorators.http import require_http_methods
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-# Create or get the assistant
 def get_personality_instructions(personality):
     base_instructions = """Your role is to guide users through four distinct writing phases:
             
@@ -45,164 +49,157 @@ For each phase:
         Provide clear, well-organized guidance with academic references when relevant.""",
         
         'encouraging': """Be highly motivational and energetic. Celebrate small wins, provide frequent positive reinforcement, 
-        and help users see their potential. Use inspiring language and focus on progress and achievement.""",
-        
-        'empathetic': """Be gentle, understanding, and deeply supportive. Acknowledge emotions with sensitivity, 
-        validate feelings, and create a safe space for expression. Use compassionate language and show deep understanding 
-        of the user's experiences."""
+        and maintain an upbeat, supportive tone throughout the conversation. Focus on building confidence 
+        and maintaining momentum."""
     }
     
     return f"{base_instructions}\n\nTone and Style:\n{personality_styles.get(personality, personality_styles['friendly'])}"
 
-def get_or_create_assistant(personality):
-    try:
-        # Set a high token limit for long writing sessions
-        model = "gpt-4-0125-preview"  # Latest model with 128k context window
-        
-        instructions = get_personality_instructions(personality)
-        
-        # Create a new assistant with high token limits
-        assistant = client.beta.assistants.create(
-            name="Expressive Writing Guide",
-            instructions=instructions,
-            model=model,
-            tools=[],
-        )
-        return assistant
-    except Exception as e:
-        print(f"Error creating assistant: {str(e)}")
-        return None
-
-def get_or_create_thread(user):
-    """Get existing thread or create a new one for the user"""
-    user_thread = UserThread.objects.filter(user=user).order_by('-last_interaction').first()
-    
-    if not user_thread:
-        # Create a new thread
-        thread = client.beta.threads.create()
-        user_thread = UserThread.objects.create(
-            user=user,
-            thread_id=thread.id
-        )
-    return user_thread
-
 def get_user_context(user):
     """Get user's biographical context and writing goals"""
-    profile, created = UserProfile.objects.get_or_create(user=user)
-    context = "User Context:\n"
-    
-    if profile.bio_context:
-        context += f"Background: {profile.bio_context}\n"
-    if profile.writing_goals:
-        context += f"Writing Goals: {profile.writing_goals}\n"
-    
-    return context if len(context) > 14 else None  # Return None if no real context added
+    try:
+        profile = UserProfile.objects.get(user=user)
+        context = []
+        if profile.bio_context:
+            context.append(f"Bio: {profile.bio_context}")
+        if profile.writing_goals:
+            context.append(f"Writing Goals: {profile.writing_goals}")
+        return "\n".join(context) if context else None
+    except UserProfile.DoesNotExist:
+        return None
 
-def check_phase_progression(message_content, event, user_thread):
+def check_phase_progression(message_content, event):
     """Check if the AI has indicated phase completion and update accordingly"""
     if "PHASE_COMPLETE:" in message_content:
         current_phase = event.current_phase
-        phase_mapping = {
-            'facts': 'feelings',
-            'feelings': 'associations',
-            'associations': 'growth',
-            'growth': 'growth'  # Stay in final phase
-        }
-        
-        # Update to next phase
-        next_phase = phase_mapping[current_phase]
-        event.current_phase = next_phase
+        if current_phase == 'facts':
+            event.current_phase = 'feelings'
+        elif current_phase == 'feelings':
+            event.current_phase = 'associations'
+        elif current_phase == 'associations':
+            event.current_phase = 'growth'
         event.save()
-        
-        # Create new thread for next phase
-        new_thread = client.beta.threads.create()
-        user_thread.thread_id = new_thread.id
-        user_thread.writing_phase = next_phase
-        user_thread.save()
-        
         return True
     return False
 
-def get_chatbot_response(message, user):
+@login_required
+def get_chatbot_response(request):
     try:
-        # Get or create user's thread
-        user_thread = get_or_create_thread(user)
-        
-        # Get the associated event
-        event = user_thread.event
-        
-        # Get user context
-        user_context = get_user_context(user)
-        
-        # Get user's personality preference
-        user_profile = UserProfile.objects.get(user=user)
-        personality = user_profile.personality_preference
-        
-        # Create a new assistant with the user's preferred personality
-        assistant = get_or_create_assistant(personality)
-        if not assistant:
-            return "I apologize, but I encountered an error. Please try again."
-        
-        # Add the user's message to the thread
-        client.beta.threads.messages.create(
-            thread_id=user_thread.thread_id,
-            role="user",
-            content=message
-        )
+        logger.info("Starting get_chatbot_response")
+        try:
+            data = json.loads(request.body)
+            message = data.get('message')
+            if not message:
+                logger.warning("No message provided in request")
+                return JsonResponse({'error': 'No message provided'})
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON request: {str(e)}")
+            return JsonResponse({'error': 'Invalid request format'})
 
-        # Run the assistant with a longer timeout
-        run = client.beta.threads.runs.create(
-            thread_id=user_thread.thread_id,
-            assistant_id=assistant.id,
-            instructions="""Remember that expressive writing sessions can be long (up to 20 minutes). 
-            Do not interrupt the user while they are writing. Only respond when they explicitly ask for guidance 
-            or when they indicate they are done with their current writing. Focus on encouraging deep, 
-            continuous writing rather than frequent back-and-forth dialogue."""
-        )
+        try:
+            user_profile = UserProfile.objects.get(user=request.user)
+            system_prompt = get_personality_instructions(user_profile.personality_preference)
+            
+            user_context = get_user_context(request.user)
+            if user_context:
+                system_prompt += f"\n\nUser Context:\n{user_context}"
+            
+            current_event = Event.objects.filter(user=request.user).order_by('-created_at').first()
+            
+        except UserProfile.DoesNotExist:
+            logger.error(f"UserProfile not found for user {request.user.username}")
+            return JsonResponse({'error': 'User profile not found'})
+        except Exception as e:
+            logger.error(f"Error getting user context: {str(e)}", exc_info=True)
+            return JsonResponse({'error': 'Failed to get user context'})
 
-        # Wait for completion with a longer timeout
-        timeout = 60  # 60 seconds timeout
-        start_time = time.time()
-        while True:
-            if time.time() - start_time > timeout:
-                return "I apologize, but the response is taking longer than expected. Please try again."
+        try:
+            messages = [
+                {"role": "system", "content": system_prompt}
+            ]
+            
+            if current_event:
+                messages[0]["content"] += f"\n\nCurrent Event: {current_event.title}"
+                messages[0]["content"] += f"\nCurrent Phase: {current_event.current_phase}"
                 
-            run_status = client.beta.threads.runs.retrieve(
-                thread_id=user_thread.thread_id,
-                run_id=run.id
+                previous_messages = ChatMessage.objects.filter(
+                    user_thread__user=request.user,
+                    user_thread__event=current_event
+                ).order_by('created_at')[:5]
+                
+                for prev_msg in previous_messages:
+                    messages.append({
+                        "role": "user" if prev_msg.message_type == "user" else "assistant",
+                        "content": prev_msg.content
+                    })
+            
+            messages.append({"role": "user", "content": message})
+            
+            logger.info(f"Sending request to OpenAI with {len(messages)} messages")
+            
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=messages,
+                temperature=0.7,
+                max_tokens=1000
             )
-            if run_status.status == 'completed':
-                break
-            elif run_status.status == 'failed':
-                return "I apologize, but I encountered an error. Please try again."
-            time.sleep(1)
+            
+            assistant_message = response.choices[0].message.content
+            logger.info("Received response from OpenAI")
+            
+        except Exception as e:
+            logger.error(f"Error in OpenAI communication: {str(e)}", exc_info=True)
+            return JsonResponse({'error': 'Failed to get AI response'})
 
-        # Get the assistant's messages
-        messages = client.beta.threads.messages.list(
-            thread_id=user_thread.thread_id
-        )
-        
-        # Get the latest assistant message
-        assistant_message = messages.data[0].content[0].text.value
-        
-        # Check for phase progression
-        if event and check_phase_progression(assistant_message, event, user_thread):
-            # Remove the PHASE_COMPLETE marker from the message
-            assistant_message = assistant_message.replace("PHASE_COMPLETE: " + event.current_phase, "")
-            assistant_message += f"\n\nGreat progress! Let's move on to the {event.get_current_phase_display()} phase."
-        
-        # Update last interaction time
-        user_thread.save()
-        
-        return assistant_message
-
+        try:
+            # Get the latest UserThread or create a new one
+            user_thread = UserThread.objects.filter(
+                user=request.user,
+                event=current_event
+            ).order_by('-created_at').first()
+            
+            if not user_thread:
+                user_thread = UserThread.objects.create(
+                    user=request.user,
+                    event=current_event,
+                    thread_id=str(timezone.now().timestamp())
+                )
+            
+            if current_event:
+                if check_phase_progression(assistant_message, current_event):
+                    assistant_message = assistant_message.replace(f"PHASE_COMPLETE: {current_event.current_phase}", "")
+                    assistant_message += f"\n\nGreat progress! Let's move on to the {current_event.get_current_phase_display()} phase."
+            
+            ChatMessage.objects.create(
+                user_thread=user_thread,
+                event=current_event,
+                content=message,
+                message_type='user'
+            )
+            
+            ChatMessage.objects.create(
+                user_thread=user_thread,
+                event=current_event,
+                content=assistant_message,
+                message_type='assistant'
+            )
+            
+            return JsonResponse({'response': assistant_message})
+            
+        except Exception as e:
+            logger.error(f"Error saving chat messages: {str(e)}", exc_info=True)
+            return JsonResponse({'error': 'Failed to save chat messages'})
+            
     except Exception as e:
-        print(f"Error getting chatbot response: {str(e)}")
-        return "I apologize, but I encountered an error. Please try again."
+        logger.error(f"Unexpected error in get_chatbot_response: {str(e)}", exc_info=True)
+        return JsonResponse({'error': str(e)})
 
 @login_required
 def home(request):
-    return render(request, 'chatbot/home.html')
+    conversations = []
+    if request.user.is_authenticated:
+        conversations = Conversation.objects.filter(user=request.user).order_by('-updated_at')
+    return render(request, 'chatbot/home.html', {'conversations': conversations})
 
 @login_required
 def profile(request):
@@ -242,7 +239,11 @@ def event_create(request):
 @login_required
 def event_detail(request, event_id):
     event = get_object_or_404(Event, id=event_id, user=request.user)
+    
     threads = UserThread.objects.filter(event=event).order_by('-created_at')
+    
+    for thread in threads:
+        thread.messages = thread.chatmessage_set.all().order_by('created_at')
     
     return render(request, 'chatbot/event_detail.html', {
         'event': event,
@@ -278,35 +279,65 @@ def start_writing_session(request, event_id):
     event = get_object_or_404(Event, id=event_id, user=request.user)
     
     # Create a new thread for this writing session
-    thread = client.beta.threads.create()
     user_thread = UserThread.objects.create(
         user=request.user,
         event=event,
-        thread_id=thread.id,
-        writing_phase=event.current_phase
+        thread_id=str(timezone.now().timestamp())
     )
     
     # Add initial context message
     phase_prompts = {
         'facts': "Let's focus on describing the factual details of this event. What happened? When? Where? Who was involved?",
         'feelings': "Now, let's explore your emotional response to this event. How did you feel during and after?",
-        'associations': "Let's connect this experience to your current behaviors and patterns. How do you see this event influencing your present life?",
-        'growth': "Let's focus on finding positive aspects and growth opportunities from this experience. What did you learn? How can you apply this to your life?"
+        'thoughts': "Let's examine your thoughts and beliefs about this event. What did you learn? How did it change your perspective?",
+        'growth': "Finally, let's reflect on personal growth. How has this experience shaped you? What strengths or insights have you gained?"
     }
     
-    initial_message = (
-        f"Event: {event.title}\n"
-        f"Phase: {event.get_current_phase_display()}\n\n"
-        f"{phase_prompts[event.current_phase]}"
-    )
+    initial_prompt = phase_prompts.get(event.current_phase, "Let's begin your writing session.")
     
-    client.beta.threads.messages.create(
-        thread_id=thread.id,
-        role="user",
-        content=initial_message
-    )
-    
-    return redirect('home')
+    # Get user profile and context
+    try:
+        user_profile = UserProfile.objects.get(user=request.user)
+        system_prompt = get_personality_instructions(user_profile.personality_preference)
+        
+        # Add user context
+        user_context = get_user_context(request.user)
+        if user_context:
+            system_prompt += f"\n\nUser Context:\n{user_context}"
+            
+        # Add event context
+        system_prompt += f"\n\nCurrent Event: {event.title}"
+        system_prompt += f"\nCurrent Phase: {event.current_phase}"
+        
+        # Get initial response from OpenAI
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "assistant", "content": initial_prompt}
+        ]
+        
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1000
+        )
+        
+        assistant_message = response.choices[0].message.content
+        
+        # Save the initial message
+        ChatMessage.objects.create(
+            user_thread=user_thread,
+            event=event,
+            content=assistant_message,
+            message_type='assistant'
+        )
+        
+        return redirect('chat')
+        
+    except Exception as e:
+        logger.error(f"Error starting writing session: {str(e)}", exc_info=True)
+        messages.error(request, "Failed to start writing session. Please try again.")
+        return redirect('event_detail', event_id=event.id)
 
 @login_required
 def chat(request):
@@ -314,13 +345,96 @@ def chat(request):
         return render(request, 'chatbot/home.html')
     elif request.method == 'POST':
         try:
+            print("Chat POST request received")  # Debug log
             data = json.loads(request.body)
             user_message = data.get('message', '')
-            bot_response = get_chatbot_response(user_message, request.user)
+            print(f"Processing message: {user_message}")  # Debug log
+            
+            if not user_message:
+                return JsonResponse({'error': 'No message provided'}, status=400)
+            
+            bot_response = get_openai_response(user_message, get_or_create_thread(request.user))
+            print(f"Bot response: {bot_response}")  # Debug log
             return JsonResponse({'message': bot_response})
-        except json.JSONDecodeError:
+            
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {str(e)}")  # Debug log
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
         except Exception as e:
-            print(f"Chat error: {str(e)}")  # Log the error
+            print(f"Chat error: {str(e)}")  # Debug log
             return JsonResponse({'error': 'An error occurred processing your request'}, status=500)
     return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+@login_required
+def get_conversation(request, conversation_id):
+    try:
+        conversation = Conversation.objects.get(id=conversation_id, user=request.user)
+        messages = ChatMessage.objects.filter(event=conversation.event).order_by('created_at')
+        
+        messages_data = [{
+            'content': msg.content,
+            'message_type': msg.message_type,
+            'timestamp': msg.created_at.isoformat()
+        } for msg in messages]
+        
+        return JsonResponse({
+            'id': conversation.id,
+            'title': conversation.title,
+            'messages': messages_data
+        })
+    except Conversation.DoesNotExist:
+        return JsonResponse({'error': 'Conversation not found'}, status=404)
+    except Exception as e:
+        logger.error(f'Error in get_conversation: {str(e)}')
+        return JsonResponse({'error': 'Internal server error'}, status=500)
+
+@login_required
+def get_phase_history(request, event_id, phase):
+    try:
+        event = get_object_or_404(Event, id=event_id, user=request.user)
+        thread = UserThread.objects.filter(event=event).first()
+        
+        if not thread:
+            return JsonResponse({'messages': []})
+            
+        messages = ChatMessage.objects.filter(
+            user_thread=thread,
+            phase=phase
+        ).order_by('created_at')
+        
+        messages_data = []
+        for msg in messages:
+            messages_data.append({
+                'content': msg.content,
+                'type': msg.message_type,
+                'timestamp': msg.created_at.strftime('%Y-%m-%d %H:%M')
+            })
+            
+        return JsonResponse({
+            'messages': messages_data,
+            'phase': phase,
+            'phase_display': dict(Event.PHASE_CHOICES)[phase]
+        })
+    except Exception as e:
+        logger.error(f"Error getting phase history: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@require_http_methods(["POST"])
+def save_session(request):
+    try:
+        data = json.loads(request.body)
+        event = Event.objects.get(id=data['event_id'])
+        
+        session = ChatSession(
+            event=event,
+            phase=data['phase']
+        )
+        session.set_messages(data['messages'])
+        session.save()
+        
+        return JsonResponse({'success': True})
+    except Event.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Event not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

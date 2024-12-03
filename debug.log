@@ -1,0 +1,23 @@
+INFO 2024-12-01 19:50:29,757 autoreload 1628 8008 Watching for file changes with StatReloader
+INFO 2024-12-01 19:50:29,998 autoreload 9028 13836 Watching for file changes with StatReloader
+INFO 2024-12-01 19:50:45,537 autoreload 18816 16548 Watching for file changes with StatReloader
+INFO 2024-12-01 19:51:23,296 autoreload 6692 13008 Watching for file changes with StatReloader
+INFO 2024-12-01 19:51:29,831 basehttp 1628 13940 "GET / HTTP/1.1" 200 17928
+WARNING 2024-12-01 19:51:29,939 log 1628 13940 Not Found: /favicon.ico
+WARNING 2024-12-01 19:51:29,946 basehttp 1628 13940 "GET /favicon.ico HTTP/1.1" 404 179
+INFO 2024-12-01 19:51:33,235 basehttp 1628 13940 "GET /accounts/logout/ HTTP/1.1" 302 0
+INFO 2024-12-01 19:51:33,241 basehttp 1628 13940 "GET / HTTP/1.1" 302 0
+INFO 2024-12-01 19:51:33,253 basehttp 1628 13940 "GET /accounts/login/?next=/ HTTP/1.1" 200 7656
+INFO 2024-12-01 19:51:35,134 basehttp 1628 13940 "POST /accounts/login/?next=/ HTTP/1.1" 302 0
+INFO 2024-12-01 19:51:35,137 basehttp 1628 13940 "GET / HTTP/1.1" 200 17928
+ERROR 2024-12-01 19:51:36,590 log 1628 13940 Internal Server Error: /chat/
+ERROR 2024-12-01 19:51:36,591 basehttp 1628 13940 "POST /chat/ HTTP/1.1" 500 54
+INFO 2024-12-01 19:52:19,222 autoreload 9028 13836 C:\Users\X1\OneDrive\PROJECT\EP\chatbot\views.py changed, reloading.
+INFO 2024-12-01 19:52:19,331 autoreload 1628 8008 C:\Users\X1\OneDrive\PROJECT\EP\chatbot\views.py changed, reloading.
+INFO 2024-12-01 19:52:19,479 autoreload 18816 16548 C:\Users\X1\OneDrive\PROJECT\EP\chatbot\views.py changed, reloading.
+INFO 2024-12-01 19:52:19,713 autoreload 8576 16996 Watching for file changes with StatReloader
+INFO 2024-12-01 19:52:19,837 autoreload 14580 8408 Watching for file changes with StatReloader
+INFO 2024-12-01 19:52:19,971 autoreload 12368 16284 Watching for file changes with StatReloader
+INFO 2024-12-01 19:52:28,762 autoreload 8576 16996 C:\Users\X1\OneDrive\PROJECT\EP\ep\settings.py changed, reloading.
+INFO 2024-12-01 19:52:28,939 autoreload 14580 8408 C:\Users\X1\OneDrive\PROJECT\EP\chatbot\models.py changed, reloading.
+INFO 2024-12-01 19:52:29,022 autoreload 12368 16284 C:\Users\X1\OneDrive\PROJECT\EP\ep\settings.py changed, reloading.

@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        height: calc(100vh - 100px);  
+        display: flex;
+        flex-direction: column;
+        background: #1e1e1e;  
+        color: #ffffff;
+    }
+    
+    .chat-history {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        background: #2d2d2d;  
+        border-radius: 8px;
+    }
+    
+    .message {
+        max-width: 80%;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        border-radius: 8px;
+    }
+    
+    .user-message {
+        margin-left: auto;
+        background-color: #0078d4;  
+        color: white;
+    }
+    
+    .assistant-message {
+        margin-right: auto;
+        background-color: #3c3c3c;  
+        color: #ffffff;
+    }
+    
+    .message-timestamp {
+        font-size: 0.8rem;
+        opacity: 0.7;
+    }
+    
+    .chat-input {
+        padding: 1rem;
+        background: #2d2d2d;
+        border-top: 1px solid #3c3c3c;
+    }
+    
+    .phase-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+        background: #2d2d2d;
+    }
+    
+    .phase-tab {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        background: #3c3c3c;
+        color: #ffffff;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .phase-tab:hover {
+        background: #4c4c4c;
+    }
+    
+    .phase-tab.active {
+        background: #0078d4;
+        color: white;
+    }
+
+    #user-input {
+        background: #3c3c3c;
+        border: 1px solid #4c4c4c;
+        color: #ffffff;
+    }
+
+    #user-input::placeholder {
+        color: #808080;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid h-100 p-0">
+    <div class="chat-container">
+        <div class="phase-tabs">
+            {% for phase, display in event.PHASE_CHOICES %}
+            <button class="phase-tab {% if phase == event.current_phase %}active{% endif %}"
+                    onclick="loadPhaseHistory('{{ event.id }}', '{{ phase }}')">
+                {{ display }}
+            </button>
+            {% endfor %}
+        </div>
+        
+        <div id="chat-history" class="chat-history">
+            <!-- Messages will be loaded here -->
+        </div>
+        
+        <div class="chat-input">
+            <form id="chat-form" class="d-flex gap-2">
+                <input type="text" id="user-input" class="form-control" placeholder="Type your message...">
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/chat.js' %}"></script>
+<script>
+    // Load initial phase history
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPhaseHistory('{{ event.id }}', '{{ event.current_phase }}');
+    });
+</script>
+{% endblock %}

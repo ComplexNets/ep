@@ -1,36 +1,45 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="chat-container h-100">
-    <div class="chat-messages flex-grow-1" id="chat-messages">
-        <div class="message bot-message">
-            Welcome to your expressive writing journey! I'm here to guide and support you. To get started, you can click on any of these common questions or share what's on your mind:
-        </div>
-        <div class="starter-questions">
-            <div class="question-card" onclick="askQuestion('What is expressive writing and how can it help me?')">
-                <i class="bi bi-journal-text"></i>
-                What is expressive writing?
-            </div>
-            <div class="question-card" onclick="askQuestion('What are the proven benefits of expressive writing according to research studies?')">
-                <i class="bi bi-graph-up"></i>
-                What benefits does research show?
-            </div>
-            <div class="question-card" onclick="askQuestion('Are there any short-term negative effects I should be aware of when doing expressive writing?')">
-                <i class="bi bi-shield-check"></i>
-                Are there any short-term effects to consider?
-            </div>
-            <div class="question-card" onclick="askQuestion('How do we start the expressive writing process?')">
-                <i class="bi bi-play-circle"></i>
-                How do we get started?
+<div class="d-flex h-100">
+    <!-- Main Chat Area -->
+    <div class="chat-container flex-grow-1">
+        <div class="chat-header">
+            <div class="d-flex justify-content-between align-items-center p-3">
+                <h5 class="mb-0">Chat Session</h5>
+                <button class="btn btn-primary" onclick="saveSession()">
+                    <i class="bi bi-save"></i> Save Session
+                </button>
             </div>
         </div>
-    </div>
-    <div class="chat-input mt-3">
-        <div class="input-group">
-            <input type="text" id="user-input" class="form-control" placeholder="Type your message here..." autocomplete="off">
-            <button class="btn btn-primary" onclick="sendMessage()">
-                <i class="bi bi-send"></i> Send
-            </button>
+        <div class="chat-messages flex-grow-1" id="chat-messages">
+            <div class="message bot-message">
+                Welcome to your expressive writing journey! I'm here to guide and support you. To get started, you can click on any of these common questions or share what's on your mind:
+            </div>
+            <div class="starter-questions">
+                <div class="question-card" onclick="askQuestion('What is expressive writing and how can it help me?')">
+                    <i class="bi bi-journal-text"></i>
+                    What is expressive writing?
+                </div>
+                <div class="question-card" onclick="askQuestion('What are the proven benefits of expressive writing according to research studies?')">
+                    <i class="bi bi-graph-up"></i>
+                    What benefits does research show?
+                </div>
+                <div class="question-card" onclick="askQuestion('Are there any short-term negative effects I should be aware of when doing expressive writing?')">
+                    <i class="bi bi-shield-check"></i>
+                    Are there any short-term effects to consider?
+                </div>
+                <div class="question-card" onclick="askQuestion('How do we start the expressive writing process?')">
+                    <i class="bi bi-play-circle"></i>
+                    How do we get started?
+                </div>
+            </div>
+        </div>
+        <div class="chat-input">
+            <form id="chat-form" class="d-flex" onsubmit="event.preventDefault(); sendMessage();">
+                <input type="text" id="user-input" class="form-control me-2" placeholder="Type your message...">
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
         </div>
     </div>
 </div>
@@ -40,93 +49,90 @@
         display: flex;
         flex-direction: column;
         height: calc(100vh - 60px);
-        margin: -1.5rem;
-        padding: 1rem;
+        background: #1e1e1e;
+    }
+
+    .chat-header {
+        background: #2d2d2d;
+        border-bottom: 1px solid #3d3d3d;
     }
 
     .chat-messages {
-        flex: 1 1 auto;
+        flex-grow: 1;
         overflow-y: auto;
-        padding: 1rem;
-        background: var(--bs-dark-bg-subtle);
-        border-radius: 0.5rem;
-        min-height: 75vh;
-        margin-bottom: 0.5rem;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
     }
 
     .message {
-        margin-bottom: 0.75rem;
-        padding: 0.75rem 1rem;
-        border-radius: 0.5rem;
-        max-width: 85%;
+        max-width: 80%;
+        margin-bottom: 15px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        word-wrap: break-word;
     }
 
     .bot-message {
-        background: var(--bs-secondary-bg);
-        margin-right: auto;
-        margin-left: 0;
+        align-self: flex-start;
+        background-color: #2d2d2d;
+        color: #ffffff;
     }
 
     .user-message {
-        background: var(--bs-primary);
-        color: white;
-        margin-left: auto;
-        margin-right: 0;
-    }
-
-    .chat-input {
-        flex-shrink: 0;
+        align-self: flex-end;
+        background-color: #0078d4;
+        color: #ffffff;
     }
 
     .starter-questions {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 1rem;
-        margin: 1rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
     }
 
     .question-card {
-        background: var(--bs-secondary-bg);
-        padding: 1rem;
-        border-radius: 0.5rem;
+        background-color: #2d2d2d;
+        padding: 15px;
+        border-radius: 8px;
         cursor: pointer;
-        transition: all 0.2s ease;
-        border: 1px solid var(--bs-border-color);
+        transition: background-color 0.2s;
+        color: #ffffff;
     }
 
     .question-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        border-color: var(--bs-primary);
+        background-color: #3d3d3d;
     }
 
     .question-card i {
-        margin-right: 0.5rem;
-        color: var(--bs-primary);
+        margin-right: 8px;
+        color: #0078d4;
+    }
+
+    .chat-input {
+        padding: 20px;
+        background: #2d2d2d;
+        border-top: 1px solid #3d3d3d;
+    }
+
+    #user-input {
+        background: #1e1e1e;
+        border: 1px solid #3d3d3d;
+        color: #ffffff;
+    }
+
+    #user-input::placeholder {
+        color: #6c757d;
     }
 
     .typing-indicator {
-        display: flex;
-        align-items: center;
-        margin-bottom: 0.75rem;
-    }
-
-    .typing-indicator span {
-        height: 8px;
-        width: 8px;
-        margin: 0 1px;
-        background-color: #9e9ea1;
-        display: block;
-        border-radius: 50%;
-        opacity: 0.4;
-    }
-
-    .typing-indicator span:nth-of-type(1) { animation: 1s blink infinite .3333s; }
-    .typing-indicator span:nth-of-type(2) { animation: 1s blink infinite .6666s; }
-    .typing-indicator span:nth-of-type(3) { animation: 1s blink infinite .9999s; }
-
-    @keyframes blink {
-        50% { opacity: 1; }
+        padding: 12px 16px;
+        background-color: #2d2d2d;
+        border-radius: 8px;
+        color: #ffffff;
+        align-self: flex-start;
+        margin-bottom: 15px;
     }
 </style>
 
@@ -151,7 +157,7 @@
     const userInput = document.getElementById('user-input');
     const typingIndicator = document.createElement('div');
     typingIndicator.className = 'typing-indicator';
-    typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+    typingIndicator.textContent = 'Assistant is typing...';
 
     function showTypingIndicator() {
         chatMessages.appendChild(typingIndicator);
@@ -164,27 +170,12 @@
         }
     }
 
-    async function typeMessage(element, text) {
-        for (let i = 0; i < text.length; i++) {
-            element.textContent += text[i];
-            await new Promise(resolve => setTimeout(resolve, 20));
-        }
-    }
-
     function addMessage(message, isUser = false) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-        
-        if (!isUser) {
-            messageDiv.textContent = '';
-            typeMessage(messageDiv, message);
-        } else {
-            messageDiv.textContent = message;
-        }
-        
+        messageDiv.textContent = message;
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        return messageDiv;
     }
 
     function askQuestion(question) {
@@ -192,63 +183,80 @@
         sendMessage();
     }
 
-    async function sendMessage() {
+    function sendMessage() {
         const message = userInput.value.trim();
-        if (!message) return;
+        if (message) {
+            addMessage(message, true);
+            userInput.value = '';
+            showTypingIndicator();
 
-        // Clear input and disable it while processing
-        userInput.value = '';
-        userInput.disabled = true;
-
-        // Add user message
-        addMessage(message, true);
-
-        // Show typing indicator
-        showTypingIndicator();
-
-        try {
-            const response = await fetch('/chat/', {
+            fetch('/chat/response/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken,
+                    'X-CSRFToken': csrftoken
                 },
-                body: JSON.stringify({ message: message }),
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideTypingIndicator();
+                if (data.error) {
+                    addMessage('I apologize, but I encountered an error. Please try again.');
+                } else {
+                    addMessage(data.response);
+                }
+            })
+            .catch(error => {
+                hideTypingIndicator();
+                addMessage('I apologize, but I encountered an error. Please try again.');
+                console.error('Error:', error);
             });
-
-            const data = await response.json();
-
-            // Hide typing indicator
-            hideTypingIndicator();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'An error occurred');
-            }
-
-            // Add bot response
-            if (data.message) {
-                addMessage(data.message);
-            } else {
-                throw new Error('Invalid response format');
-            }
-
-        } catch (error) {
-            console.error('Error:', error);
-            hideTypingIndicator();
-            addMessage('I apologize, but I encountered an error. Please try again.');
-        } finally {
-            // Re-enable input
-            userInput.disabled = false;
-            userInput.focus();
         }
     }
 
-    // Handle Enter key
+    function saveSession() {
+        const messages = Array.from(document.querySelectorAll('.message')).map(msg => ({
+            content: msg.textContent,
+            type: msg.classList.contains('user-message') ? 'user' : 'assistant'
+        }));
+
+        const sessionData = {
+            event_id: '{{ event.id }}',
+            phase: '{{ current_phase }}',
+            messages: messages,
+            timestamp: new Date().toISOString()
+        };
+
+        fetch('/chatbot/save_session/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify(sessionData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Session saved successfully!');
+                // Optionally refresh the sessions list
+                location.reload();
+            } else {
+                alert('Failed to save session: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to save session. Please try again.');
+        });
+    }
+
     userInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
+            e.preventDefault();
             sendMessage();
         }
     });
 </script>
-
 {% endblock %}
