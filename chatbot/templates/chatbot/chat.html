@@ -76,6 +76,22 @@
         color: white;
     }
 
+    .phase-sessions {
+        background: #2d2d2d;
+        border-radius: 8px;
+        margin: 0 1rem;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .session-item {
+        transition: background-color 0.2s;
+    }
+
+    .session-item:hover {
+        background-color: #3c3c3c !important;
+    }
+
     #user-input {
         background: #3c3c3c;
         border: 1px solid #4c4c4c;
@@ -85,28 +101,125 @@
     #user-input::placeholder {
         color: #808080;
     }
+    
+    .chat-header {
+        background-color: #2d2d2d;
+        border-bottom: 1px solid #3c3c3c;
+    }
+    
+    .chat-messages {
+        overflow-y: auto;
+        padding: 1rem;
+    }
+    
+    .bot-message {
+        background-color: #3c3c3c;
+        color: #ffffff;
+        padding: 0.75rem;
+        border-radius: 8px;
+    }
+    
+    .starter-questions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        padding: 1rem;
+    }
+    
+    .question-card {
+        background-color: #3c3c3c;
+        color: #ffffff;
+        padding: 0.75rem;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    
+    .question-card:hover {
+        background-color: #4c4c4c;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid h-100 p-0">
-    <div class="chat-container">
-        <div class="phase-tabs">
-            {% for phase, display in event.PHASE_CHOICES %}
-            <button class="phase-tab {% if phase == event.current_phase %}active{% endif %}"
-                    onclick="loadPhaseHistory('{{ event.id }}', '{{ phase }}')">
-                {{ display }}
-            </button>
-            {% endfor %}
+<div class="d-flex h-100">
+    <!-- Main Chat Area -->
+    <div class="chat-container flex-grow-1" {% if event %}data-event-id="{{ event.id }}"{% endif %}>
+        <div class="chat-header">
+            <div class="d-flex justify-content-between align-items-center p-3">
+                <h5 class="mb-0">
+                    {% if event %}
+                        Chat Session: {{ event.title }}
+                    {% else %}
+                        General Chat
+                    {% endif %}
+                </h5>
+            </div>
+            {% if event %}
+            <div class="phase-tabs">
+                <button class="phase-tab {% if event.current_phase == 'facts' %}active{% endif %}" 
+                        data-phase="facts"
+                        onclick="switchPhase('{{ event.id }}', 'facts')">
+                    Facts
+                </button>
+                <button class="phase-tab {% if event.current_phase == 'feelings' %}active{% endif %}"
+                        data-phase="feelings"
+                        onclick="switchPhase('{{ event.id }}', 'feelings')">
+                    Feelings
+                </button>
+                <button class="phase-tab {% if event.current_phase == 'thoughts' %}active{% endif %}"
+                        data-phase="thoughts"
+                        onclick="switchPhase('{{ event.id }}', 'thoughts')">
+                    Thoughts
+                </button>
+                <button class="phase-tab {% if event.current_phase == 'growth' %}active{% endif %}"
+                        data-phase="growth"
+                        onclick="switchPhase('{{ event.id }}', 'growth')">
+                    Growth
+                </button>
+            </div>
+            {% endif %}
         </div>
-        
-        <div id="chat-history" class="chat-history">
-            <!-- Messages will be loaded here -->
+
+        <!-- Phase Sessions Container -->
+        {% if event %}
+        <div id="phase-sessions" class="phase-sessions p-3">
+            <!-- Sessions will be loaded here dynamically -->
         </div>
-        
+        {% endif %}
+
+        <div class="chat-messages flex-grow-1" id="chat-messages">
+            <div class="message bot-message">
+                {% if event %}
+                    Welcome to your writing session for "{{ event.title }}". We're currently in the {{ event.get_current_phase_display }} phase. How would you like to proceed?
+                {% else %}
+                    Welcome to your expressive writing journey! I'm here to guide and support you. To get started, you can click on any of these common questions or share what's on your mind:
+                {% endif %}
+            </div>
+            {% if not event %}
+                <div class="starter-questions">
+                    <div class="question-card" onclick="askQuestion('What is expressive writing and how can it help me?')">
+                        <i class="bi bi-journal-text"></i>
+                        What is expressive writing?
+                    </div>
+                    <div class="question-card" onclick="askQuestion('What are the proven benefits of expressive writing according to research studies?')">
+                        <i class="bi bi-graph-up"></i>
+                        What benefits does research show?
+                    </div>
+                    <div class="question-card" onclick="askQuestion('Are there any short-term negative effects I should be aware of when doing expressive writing?')">
+                        <i class="bi bi-shield-check"></i>
+                        Are there any short-term effects to consider?
+                    </div>
+                    <div class="question-card" onclick="askQuestion('How do we start the expressive writing process?')">
+                        <i class="bi bi-play-circle"></i>
+                        How do we get started?
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
         <div class="chat-input">
-            <form id="chat-form" class="d-flex gap-2">
-                <input type="text" id="user-input" class="form-control" placeholder="Type your message...">
+            <form id="chat-form" class="d-flex" onsubmit="event.preventDefault(); sendMessage();">
+                <input type="text" id="user-input" class="form-control me-2" placeholder="Type your message...">
                 <button type="submit" class="btn btn-primary">Send</button>
             </form>
         </div>
@@ -117,9 +230,10 @@
 {% block extra_js %}
 <script src="{% static 'js/chat.js' %}"></script>
 <script>
-    // Load initial phase history
     document.addEventListener('DOMContentLoaded', function() {
-        loadPhaseHistory('{{ event.id }}', '{{ event.current_phase }}');
+        {% if event %}
+            loadPhaseSessions('{{ event.id }}', '{{ event.current_phase }}');
+        {% endif %}
     });
 </script>
 {% endblock %}

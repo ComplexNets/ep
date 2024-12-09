@@ -2,15 +2,16 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+import json
 
 # Create your models here.
 
 class Event(models.Model):
     WRITING_PHASE_CHOICES = [
-        ('facts', 'Factual Description'),
-        ('feelings', 'Emotional Response'),
-        ('associations', 'Behavioral Associations'),
-        ('growth', 'Positive Reframing & Growth')
+        ('facts', 'Facts'),
+        ('feelings', 'Feelings'),
+        ('thoughts', 'Thoughts'),
+        ('growth', 'Growth')
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -61,12 +62,18 @@ class ChatMessage(models.Model):
     message_type = models.CharField(max_length=10, choices=MESSAGE_TYPES)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
-    
+    phase = models.CharField(
+        max_length=20,
+        choices=Event.WRITING_PHASE_CHOICES,
+        default='facts'
+    )
+
     class Meta:
         ordering = ['created_at']
         indexes = [
             models.Index(fields=['event', 'created_at'], name='chat_event_created_idx'),
             models.Index(fields=['user_thread', 'created_at'], name='chat_thread_created_idx'),
+            models.Index(fields=['user_thread', 'phase'], name='chat_thread_phase_idx'),
         ]
     
     def get_formatted_time(self):
@@ -124,21 +131,32 @@ class UserProfile(models.Model):
 
 class ChatSession(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='chat_sessions')
-    phase = models.CharField(max_length=50)
+    phase = models.CharField(
+        max_length=20,
+        choices=Event.WRITING_PHASE_CHOICES,
+        default='facts'
+    )
+    title = models.CharField(max_length=200, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
-    messages_json = models.TextField()  # Store messages as JSON string
-
-    def set_messages(self, messages):
-        self.messages_json = json.dumps(messages)
-
-    def get_messages(self):
-        return json.loads(self.messages_json)
-
-    def __str__(self):
-        return f"Chat Session for {self.event} - {self.phase} at {self.timestamp}"
-
+    messages_json = models.TextField()
+    
     class Meta:
         ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['event', 'phase', 'timestamp'], name='chat_session_lookup_idx'),
+        ]
+    
+    def set_messages(self, messages):
+        self.messages_json = json.dumps(messages)
+    
+    def get_messages(self):
+        return json.loads(self.messages_json) if self.messages_json else []
+    
+    def __str__(self):
+        return f"{self.event.title} - {self.phase} ({self.timestamp.strftime('%Y-%m-%d %H:%M')})"
+    
+    def get_formatted_date(self):
+        return self.timestamp.strftime("%B %d, %Y %I:%M %p")
 
 # Signal to create UserProfile when a new User is created
 @receiver(post_save, sender=User)

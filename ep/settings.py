@@ -135,9 +135,7 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
-STATIC_URL = '/static/'
+STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
@@ -147,7 +145,7 @@ STATICFILES_DIRS = [
 os.makedirs(BASE_DIR / 'static', exist_ok=True)
 os.makedirs(BASE_DIR / 'staticfiles', exist_ok=True)
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Authentication settings
 LOGIN_REDIRECT_URL = '/'

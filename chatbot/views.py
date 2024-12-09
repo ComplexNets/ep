@@ -1,22 +1,24 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from openai import OpenAI
-import json
-from django.conf import settings
-import os
-from dotenv import load_dotenv
-import time
 from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from .models import UserThread, UserProfile, Event, Conversation, ChatMessage, ChatSession
-from .forms import UserProfileForm, EventForm
-from django.utils import timezone
-import logging
 from django.views.decorators.http import require_http_methods
+from django.contrib import messages
+from django.conf import settings
+from django.utils import timezone
+from openai import OpenAI
+from .models import Event, UserProfile, UserThread, ChatMessage, ChatSession, Conversation
+from .forms import UserProfileForm, EventForm
+from dotenv import load_dotenv
+import json
+import logging
+import os
+import time
+import uuid
 
 logger = logging.getLogger(__name__)
 
+# Load environment variables
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
@@ -72,12 +74,12 @@ def check_phase_progression(message_content, event):
     """Check if the AI has indicated phase completion and update accordingly"""
     if "PHASE_COMPLETE:" in message_content:
         current_phase = event.current_phase
-        if current_phase == 'facts':
-            event.current_phase = 'feelings'
-        elif current_phase == 'feelings':
-            event.current_phase = 'associations'
-        elif current_phase == 'associations':
-            event.current_phase = 'growth'
+        if current_phase == 'factual_description':
+            event.current_phase = 'emotional_response'
+        elif current_phase == 'emotional_response':
+            event.current_phase = 'behavioral_associations'
+        elif current_phase == 'behavioral_associations':
+            event.current_phase = 'positive_reframing'
         event.save()
         return True
     return False
@@ -89,6 +91,11 @@ def get_chatbot_response(request):
         try:
             data = json.loads(request.body)
             message = data.get('message')
+            event_id = data.get('event_id')
+            phase = data.get('phase')
+            
+            logger.info(f"Received request data: message={message}, event_id={event_id}, phase={phase}")
+            
             if not message:
                 logger.warning("No message provided in request")
                 return JsonResponse({'error': 'No message provided'})
@@ -98,101 +105,121 @@ def get_chatbot_response(request):
 
         try:
             user_profile = UserProfile.objects.get(user=request.user)
+            logger.info(f"Got user profile for {request.user.username}")
+            
             system_prompt = get_personality_instructions(user_profile.personality_preference)
+            logger.info("Generated system prompt")
             
             user_context = get_user_context(request.user)
             if user_context:
                 system_prompt += f"\n\nUser Context:\n{user_context}"
             
-            current_event = Event.objects.filter(user=request.user).order_by('-created_at').first()
+            # Get the event if event_id is provided, otherwise get the latest event
+            if event_id:
+                current_event = get_object_or_404(Event, id=event_id, user=request.user)
+                logger.info(f"Found event with id {event_id}")
+            else:
+                current_event = Event.objects.filter(user=request.user).order_by('-created_at').first()
+                logger.info("Using latest event")
             
         except UserProfile.DoesNotExist:
             logger.error(f"UserProfile not found for user {request.user.username}")
             return JsonResponse({'error': 'User profile not found'})
+        except Event.DoesNotExist:
+            logger.error(f"Event not found: {event_id}")
+            return JsonResponse({'error': 'Event not found'})
         except Exception as e:
             logger.error(f"Error getting user context: {str(e)}", exc_info=True)
             return JsonResponse({'error': 'Failed to get user context'})
 
+        messages = [
+            {"role": "system", "content": system_prompt}
+        ]
+        
+        if current_event:
+            messages[0]["content"] += f"\n\nCurrent Event: {current_event.title}"
+            messages[0]["content"] += f"\nCurrent Phase: {phase or current_event.current_phase}"
+            
+            # Get previous messages for this event and phase
+            previous_messages = ChatMessage.objects.filter(
+                user_thread__user=request.user,
+                user_thread__event=current_event,
+                phase=phase or current_event.current_phase
+            ).order_by('created_at')[:5]
+            
+            for prev_msg in previous_messages:
+                messages.append({
+                    "role": "user" if prev_msg.message_type == "user" else "assistant",
+                    "content": prev_msg.content
+                })
+        
+        messages.append({"role": "user", "content": message})
+        
+        logger.info(f"Sending request to OpenAI with {len(messages)} messages")
+        
         try:
-            messages = [
-                {"role": "system", "content": system_prompt}
-            ]
-            
-            if current_event:
-                messages[0]["content"] += f"\n\nCurrent Event: {current_event.title}"
-                messages[0]["content"] += f"\nCurrent Phase: {current_event.current_phase}"
-                
-                previous_messages = ChatMessage.objects.filter(
-                    user_thread__user=request.user,
-                    user_thread__event=current_event
-                ).order_by('created_at')[:5]
-                
-                for prev_msg in previous_messages:
-                    messages.append({
-                        "role": "user" if prev_msg.message_type == "user" else "assistant",
-                        "content": prev_msg.content
-                    })
-            
-            messages.append({"role": "user", "content": message})
-            
-            logger.info(f"Sending request to OpenAI with {len(messages)} messages")
-            
+            logger.info("Attempting to call OpenAI API")
             response = client.chat.completions.create(
                 model="gpt-4",
                 messages=messages,
                 temperature=0.7,
                 max_tokens=1000
             )
+            logger.info("Successfully received OpenAI API response")
             
             assistant_message = response.choices[0].message.content
-            logger.info("Received response from OpenAI")
-            
-        except Exception as e:
-            logger.error(f"Error in OpenAI communication: {str(e)}", exc_info=True)
-            return JsonResponse({'error': 'Failed to get AI response'})
+            logger.info("Extracted assistant message")
 
-        try:
-            # Get the latest UserThread or create a new one
-            user_thread = UserThread.objects.filter(
-                user=request.user,
-                event=current_event
-            ).order_by('-created_at').first()
-            
-            if not user_thread:
-                user_thread = UserThread.objects.create(
-                    user=request.user,
-                    event=current_event,
-                    thread_id=str(timezone.now().timestamp())
-                )
-            
+            # Save messages to database
             if current_event:
+                logger.info("Getting/creating user thread")
+                # Get the latest thread or create a new one
+                try:
+                    user_thread = UserThread.objects.filter(
+                        user=request.user,
+                        event=current_event
+                    ).latest('created_at')
+                    created = False
+                except UserThread.DoesNotExist:
+                    user_thread = UserThread.objects.create(
+                        user=request.user,
+                        event=current_event,
+                        thread_id=str(uuid.uuid4())
+                    )
+                    created = True
+                
+                logger.info(f"{'Created new' if created else 'Using existing'} user thread")
+                
+                logger.info("Saving user message")
+                ChatMessage.objects.create(
+                    user_thread=user_thread,
+                    content=message,
+                    message_type='user',
+                    phase=phase or current_event.current_phase
+                )
+                
+                logger.info("Saving assistant message")
+                ChatMessage.objects.create(
+                    user_thread=user_thread,
+                    content=assistant_message,
+                    message_type='assistant',
+                    phase=phase or current_event.current_phase
+                )
+                
+                # Check for phase progression
                 if check_phase_progression(assistant_message, current_event):
-                    assistant_message = assistant_message.replace(f"PHASE_COMPLETE: {current_event.current_phase}", "")
-                    assistant_message += f"\n\nGreat progress! Let's move on to the {current_event.get_current_phase_display()} phase."
+                    logger.info(f"Phase progressed for event {current_event.id}")
             
-            ChatMessage.objects.create(
-                user_thread=user_thread,
-                event=current_event,
-                content=message,
-                message_type='user'
-            )
-            
-            ChatMessage.objects.create(
-                user_thread=user_thread,
-                event=current_event,
-                content=assistant_message,
-                message_type='assistant'
-            )
-            
+            logger.info("Sending response back to client")
             return JsonResponse({'response': assistant_message})
             
         except Exception as e:
-            logger.error(f"Error saving chat messages: {str(e)}", exc_info=True)
-            return JsonResponse({'error': 'Failed to save chat messages'})
+            logger.error(f"Error in OpenAI communication: {str(e)}", exc_info=True)
+            return JsonResponse({'error': str(e)})
             
     except Exception as e:
-        logger.error(f"Unexpected error in get_chatbot_response: {str(e)}", exc_info=True)
-        return JsonResponse({'error': str(e)})
+        logger.error(f"Error in get_chatbot_response: {str(e)}", exc_info=True)
+        return JsonResponse({'error': 'Failed to get AI response'})
 
 @login_required
 def home(request):
@@ -240,14 +267,19 @@ def event_create(request):
 def event_detail(request, event_id):
     event = get_object_or_404(Event, id=event_id, user=request.user)
     
-    threads = UserThread.objects.filter(event=event).order_by('-created_at')
+    # Get chat sessions for the current phase
+    sessions = ChatSession.objects.filter(
+        event=event,
+        phase=event.current_phase
+    ).order_by('-timestamp')
     
-    for thread in threads:
-        thread.messages = thread.chatmessage_set.all().order_by('created_at')
+    logger.info(f"Event detail - Found {sessions.count()} sessions for event {event_id}, phase {event.current_phase}")
+    for session in sessions:
+        logger.info(f"Session {session.id}: {session.title} ({session.phase})")
     
     return render(request, 'chatbot/event_detail.html', {
         'event': event,
-        'threads': threads,
+        'sessions': sessions,
     })
 
 @login_required
@@ -287,10 +319,10 @@ def start_writing_session(request, event_id):
     
     # Add initial context message
     phase_prompts = {
-        'facts': "Let's focus on describing the factual details of this event. What happened? When? Where? Who was involved?",
-        'feelings': "Now, let's explore your emotional response to this event. How did you feel during and after?",
-        'thoughts': "Let's examine your thoughts and beliefs about this event. What did you learn? How did it change your perspective?",
-        'growth': "Finally, let's reflect on personal growth. How has this experience shaped you? What strengths or insights have you gained?"
+        'factual_description': "Let's focus on describing the factual details of this event. What happened? When? Where? Who was involved?",
+        'emotional_response': "Now, let's explore your emotional response to this event. How did you feel during and after?",
+        'behavioral_associations': "Let's examine your thoughts and behaviors associated with this event. What patterns do you notice?",
+        'positive_reframing': "Finally, let's reflect on personal growth. How has this experience shaped you? What strengths or insights have you gained?"
     }
     
     initial_prompt = phase_prompts.get(event.current_phase, "Let's begin your writing session.")
@@ -332,7 +364,8 @@ def start_writing_session(request, event_id):
             message_type='assistant'
         )
         
-        return redirect('chat')
+        # Redirect to chat with event_id
+        return redirect(f'/chat/?event_id={event_id}')
         
     except Exception as e:
         logger.error(f"Error starting writing session: {str(e)}", exc_info=True)
@@ -342,26 +375,24 @@ def start_writing_session(request, event_id):
 @login_required
 def chat(request):
     if request.method == 'GET':
-        return render(request, 'chatbot/home.html')
+        event_id = request.GET.get('event_id')
+        if event_id:
+            event = get_object_or_404(Event, id=event_id, user=request.user)
+            return render(request, 'chatbot/home.html', {'event': event})
+        else:
+            # If no event_id is provided, show the general chat interface
+            conversations = []
+            if request.user.is_authenticated:
+                conversations = Conversation.objects.filter(user=request.user).order_by('-updated_at')
+            return render(request, 'chatbot/home.html', {'event': None, 'conversations': conversations})
     elif request.method == 'POST':
         try:
-            print("Chat POST request received")  # Debug log
-            data = json.loads(request.body)
-            user_message = data.get('message', '')
-            print(f"Processing message: {user_message}")  # Debug log
+            logger.info("Chat POST request received")
+            # We don't need to parse the request body here since get_chatbot_response does that
+            return get_chatbot_response(request)
             
-            if not user_message:
-                return JsonResponse({'error': 'No message provided'}, status=400)
-            
-            bot_response = get_openai_response(user_message, get_or_create_thread(request.user))
-            print(f"Bot response: {bot_response}")  # Debug log
-            return JsonResponse({'message': bot_response})
-            
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error: {str(e)}")  # Debug log
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
         except Exception as e:
-            print(f"Chat error: {str(e)}")  # Debug log
+            logger.error(f"Chat error: {str(e)}", exc_info=True)
             return JsonResponse({'error': 'An error occurred processing your request'}, status=500)
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
@@ -420,21 +451,162 @@ def get_phase_history(request, event_id, phase):
         return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
-@require_http_methods(["POST"])
+def get_phase_sessions(request, event_id, phase):
+    """API endpoint to get chat sessions for a specific phase"""
+    try:
+        logger.info(f"API - Fetching sessions for event {event_id}, phase {phase}")
+        
+        # Validate the event exists and belongs to the user
+        event = get_object_or_404(Event, id=event_id, user=request.user)
+        logger.info(f"Found event: {event}")
+        
+        # Validate the phase is valid
+        if phase not in dict(Event.WRITING_PHASE_CHOICES):
+            logger.error(f"Invalid phase: {phase}")
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid writing phase'
+            }, status=400)
+        
+        # Get all sessions for this event and phase
+        sessions = ChatSession.objects.filter(
+            event=event,
+            phase=phase
+        ).order_by('-timestamp')
+        logger.info(f"API - Found {sessions.count()} sessions")
+        
+        # Log each session for debugging
+        for session in sessions:
+            logger.info(f"Session {session.id}: {session.title} ({session.phase})")
+        
+        # Format the session data
+        sessions_data = []
+        for session in sessions:
+            try:
+                session_data = {
+                    'id': session.id,
+                    'title': session.title or f"Session from {session.timestamp.strftime('%B %d, %Y')}",
+                    'formatted_date': session.get_formatted_date(),
+                }
+                sessions_data.append(session_data)
+            except Exception as e:
+                logger.error(f"Error formatting session {session.id}: {str(e)}", exc_info=True)
+                continue
+        
+        return JsonResponse({
+            'success': True,
+            'sessions': sessions_data
+        })
+        
+    except Event.DoesNotExist:
+        logger.error(f"Event not found: {event_id}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Event not found'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Error fetching phase sessions: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': f"Error loading sessions: {str(e)}"
+        }, status=500)
+
+@login_required
 def save_session(request):
     try:
-        data = json.loads(request.body)
-        event = Event.objects.get(id=data['event_id'])
+        logger.info("Starting save_session")
         
-        session = ChatSession(
+        # Parse and validate request data
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+            logger.info(f"Parsed data: {data}")
+            
+            if not isinstance(data.get('messages'), list):
+                logger.error("Messages is not a list")
+                raise ValueError("Messages must be a list")
+            
+            # Validate required fields
+            required_fields = ['event_id', 'phase', 'messages']
+            for field in required_fields:
+                if field not in data:
+                    logger.error(f"Missing required field: {field}")
+                    raise KeyError(f"Missing required field: {field}")
+            
+            # Validate message format
+            for msg in data['messages']:
+                if not all(key in msg for key in ['content', 'type']):
+                    logger.error("Invalid message format")
+                    raise ValueError("Invalid message format - must have content and type")
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON: {str(e)}")
+            return JsonResponse({'success': False, 'error': 'Invalid JSON format'})
+        except ValueError as e:
+            logger.error(f"Validation error: {str(e)}")
+            return JsonResponse({'success': False, 'error': str(e)})
+        
+        # Get event and verify ownership
+        try:
+            event = Event.objects.get(id=data['event_id'], user=request.user)
+            logger.info(f"Found event: {event}")
+        except Event.DoesNotExist:
+            logger.error(f"Event not found. User: {request.user}, Event ID: {data.get('event_id')}")
+            return JsonResponse({'success': False, 'error': 'Event not found'})
+        
+        # Generate a title based on the first message or use provided title
+        title = data.get('title', '')
+        if not title and data['messages']:
+            # Use the first user message as the title, truncated
+            user_messages = [msg for msg in data['messages'] if msg['type'] == 'user']
+            if user_messages:
+                title = user_messages[0]['content'][:100] + ('...' if len(user_messages[0]['content']) > 100 else '')
+            else:
+                title = f"{event.title} - {data['phase']} Session"
+        
+        # Create a new session
+        logger.info(f"Creating new session for phase: {data['phase']}")
+        session = ChatSession.objects.create(
             event=event,
-            phase=data['phase']
+            phase=data['phase'],
+            title=title
         )
+        
+        # Save messages
+        logger.info(f"Saving {len(data['messages'])} messages")
         session.set_messages(data['messages'])
         session.save()
+        logger.info(f"Session saved successfully with ID: {session.id}")
         
-        return JsonResponse({'success': True})
-    except Event.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Event not found'})
+        return JsonResponse({
+            'success': True,
+            'session_id': session.id,
+            'title': session.title
+        })
+        
     except Exception as e:
+        logger.error(f"Error saving chat session: {str(e)}", exc_info=True)
         return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def view_session(request, session_id):
+    """View a specific chat session"""
+    try:
+        # Get the session and verify ownership
+        session = get_object_or_404(ChatSession, id=session_id)
+        if session.event.user != request.user:
+            logger.warning(f"User {request.user} attempted to access session {session_id} belonging to {session.event.user}")
+            raise Http404("Session not found")
+        
+        # Get the messages from the session
+        messages = session.get_messages()
+        
+        return render(request, 'chatbot/session_detail.html', {
+            'session': session,
+            'messages': messages,
+            'event': session.event
+        })
+        
+    except Exception as e:
+        logger.error(f"Error viewing session {session_id}: {str(e)}", exc_info=True)
+        messages.error(request, "Error loading session")
+        return redirect('event_detail', event_id=session.event.id)

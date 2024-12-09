@@ -60,6 +60,19 @@ The fourth phase is based on research showing that positive reframing and benefi
    - Profile management
    - Writing session management
 
+4. **URL Configuration**
+   - Base URL pattern: chatbot URLs are included at root level in main urls.py
+   - All chatbot-related URLs must include '/chatbot/' prefix in JavaScript fetch calls
+   - Common error: 404 errors occur when JavaScript fetch URLs don't include '/chatbot/' prefix
+   - Solution: Always use '/chatbot/[endpoint]' in frontend fetch calls to match Django's URL routing
+
+5. **Development Environment**
+
+1. **Python Environment**
+   - Conda environment: `C:\Users\X1\miniconda3\envs\ep`
+   - Environment name: `ep`
+   - Used for running Django server and managing dependencies
+
 ### Latest Progress
 
 Most recent updates include:

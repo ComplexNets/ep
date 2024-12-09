@@ -2,7 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.home, name='home'),
+    path('', views.chat, name='home'),
     path('chat/', views.chat, name='chat'),
     path('chat/response/', views.get_chatbot_response, name='get_chatbot_response'),
     path('profile/', views.profile, name='profile'),
@@ -14,5 +14,7 @@ urlpatterns = [
     path('events/<int:event_id>/write/', views.start_writing_session, name='start_writing_session'),
     path('conversation/<int:conversation_id>/', views.get_conversation, name='get_conversation'),
     path('chat/history/<int:event_id>/<str:phase>/', views.get_phase_history, name='get_phase_history'),
-    path('save_session/', views.save_session, name='save_session'),
+    path('chat/save/', views.save_session, name='save_session'),
+    path('api/sessions/<int:event_id>/<str:phase>/', views.get_phase_sessions, name='get_phase_sessions'),
+    path('session/<int:session_id>/', views.view_session, name='view_session'),
 ]

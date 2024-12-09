@@ -46,15 +46,17 @@
                             <div class="mb-4">
                                 <h5 class="text-body">Writing Progress</h5>
                                 <div class="bg-body-light p-3 rounded-3">
-                                    <div class="progress mb-2" style="height: 2rem;">
+                                    <div class="progress mb-3" style="height: 2rem;">
                                         {% with phases=event.WRITING_PHASE_CHOICES %}
                                         {% for phase, display in phases %}
-                                        <div class="progress-bar {% if event.current_phase == phase %}bg-primary{% else %}bg-body-secondary{% endif %} position-relative"
+                                        <div class="progress-bar {% if event.current_phase == phase %}bg-primary{% else %}bg-body-secondary{% endif %} position-relative cursor-pointer phase-tab"
                                              role="progressbar"
                                              style="width: 25%"
                                              aria-valuenow="25"
                                              aria-valuemin="0"
-                                             aria-valuemax="100">
+                                             aria-valuemax="100"
+                                             data-phase="{{ phase }}"
+                                             onclick="switchPhase('{{ phase }}')">
                                             <small class="position-absolute start-50 top-50 translate-middle text-body fw-medium">
                                                 {{ display }}
                                             </small>
@@ -65,28 +67,43 @@
                                 </div>
                             </div>
 
+                            <!-- Phase Sessions Container -->
+                            <div id="phase-sessions" class="mb-4" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="text-body mb-0" id="phase-title">Sessions</h5>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="closePhaseView()">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                                <div class="list-group" id="sessions-list">
+                                    <!-- Sessions will be loaded here dynamically -->
+                                </div>
+                            </div>
+
                             <!-- Writing Sessions -->
-                            {% if threads %}
-                            <div class="mb-4">
+                            <div id="all-sessions" class="mb-4">
+                                {% if sessions %}
                                 <h5 class="text-body">Writing Sessions</h5>
                                 <div class="list-group">
-                                    {% for thread in threads %}
+                                    {% for session in sessions %}
                                     <div class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between align-items-center">
                                             <div>
-                                                <h6 class="mb-1">Session from {{ thread.created_at|date:"F j, Y" }}</h6>
+                                                <h6 class="mb-1">{{ session.title }}</h6>
                                                 <p class="mb-1 text-body-secondary small">
                                                     <i class="bi bi-clock me-1"></i>
-                                                    Last interaction: {{ thread.last_interaction|timesince }} ago
+                                                    {{ session.get_formatted_date }}
                                                 </p>
                                             </div>
-                                            <span class="badge bg-primary rounded-pill">{{ thread.get_writing_phase_display }}</span>
+                                            <button class="btn btn-sm btn-primary" onclick="loadSession({{ session.id }})">
+                                                View Session
+                                            </button>
                                         </div>
                                     </div>
                                     {% endfor %}
                                 </div>
+                                {% endif %}
                             </div>
-                            {% endif %}
                         </div>
 
                         <div class="col-md-4">
@@ -141,4 +158,128 @@
         </div>
     </div>
 </div>
+
+<style>
+.phase-tab {
+    cursor: pointer;
+}
+</style>
+
+<script>
+// Store event ID globally
+const currentEventId = {{ event.id }};
+
+function switchPhase(phase) {
+    // Update tab highlighting
+    document.querySelectorAll('.phase-tab').forEach(tab => {
+        if (tab.dataset.phase === phase) {
+            tab.classList.remove('bg-body-secondary');
+            tab.classList.add('bg-primary');
+        } else {
+            tab.classList.remove('bg-primary');
+            tab.classList.add('bg-body-secondary');
+        }
+    });
+
+    // Show the phase sessions container
+    document.getElementById('phase-sessions').style.display = 'block';
+    document.getElementById('all-sessions').style.display = 'none';
+    
+    // Update the phase title
+    const phaseDisplayNames = {
+        'facts': 'Factual Description',
+        'feelings': 'Emotional Response',
+        'associations': 'Behavioral Associations',
+        'growth': 'Positive Reframing & Growth'
+    };
+    document.getElementById('phase-title').textContent = `${phaseDisplayNames[phase]} Sessions`;
+    
+    // Show loading state
+    const sessionsList = document.getElementById('sessions-list');
+    sessionsList.innerHTML = '<div class="list-group-item text-center"><div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>Loading sessions...</div>';
+    
+    // Fetch sessions for this phase using the stored event ID
+    fetch(`/chatbot/api/sessions/${currentEventId}/${phase}/`)
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error('No sessions found for this phase');
+                }
+                throw new Error(`Server error (${response.status}). Please try again.`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to load sessions');
+            }
+            
+            sessionsList.innerHTML = ''; // Clear existing sessions
+            
+            if (!data.sessions || data.sessions.length === 0) {
+                sessionsList.innerHTML = `
+                    <div class="list-group-item text-center text-muted">
+                        <p class="mb-0">No sessions found for this phase</p>
+                        <small>Click "Start Writing" to begin a new session</small>
+                    </div>`;
+                return;
+            }
+            
+            data.sessions.forEach(session => {
+                const sessionElement = document.createElement('div');
+                sessionElement.className = 'list-group-item list-group-item-action';
+                sessionElement.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">${session.title}</h6>
+                            <p class="mb-1 text-body-secondary small">
+                                <i class="bi bi-clock me-1"></i>
+                                ${session.formatted_date}
+                            </p>
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="loadSession(${session.id})">
+                            View Session
+                        </button>
+                    </div>
+                `;
+                sessionsList.appendChild(sessionElement);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching sessions:', error);
+            sessionsList.innerHTML = `
+                <div class="list-group-item text-center">
+                    <div class="text-danger mb-2">
+                        <i class="bi bi-exclamation-circle me-2"></i>
+                        ${error.message}
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="switchPhase('${phase}')">
+                        <i class="bi bi-arrow-clockwise me-1"></i>
+                        Try Again
+                    </button>
+                </div>`;
+        });
+}
+
+function closePhaseView() {
+    document.getElementById('phase-sessions').style.display = 'none';
+    document.getElementById('all-sessions').style.display = 'block';
+    
+    // Reset all tabs to their default state based on the current phase
+    const currentPhase = '{{ event.current_phase }}';
+    document.querySelectorAll('.phase-tab').forEach(tab => {
+        if (tab.dataset.phase === currentPhase) {
+            tab.classList.remove('bg-body-secondary');
+            tab.classList.add('bg-primary');
+        } else {
+            tab.classList.remove('bg-primary');
+            tab.classList.add('bg-body-secondary');
+        }
+    });
+}
+
+function loadSession(sessionId) {
+    window.location.href = `/session/${sessionId}/`;
+}
+</script>
 {% endblock %}
